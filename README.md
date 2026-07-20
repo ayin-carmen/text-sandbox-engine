@@ -50,6 +50,7 @@ Python 原型位于 `src/text_sandbox_engine/`。
 13. `narrative.choose` 场景选项执行命令。
 14. NPC 在场判断与最小可玩循环。
 15. 版本化存档 envelope、模块版本记录、组件 schema version 和迁移报告。
+16. 开发期诊断 CLI：内容校验、命令回放、场景候选报告和状态差异对比。
 
 运行测试：
 
@@ -57,9 +58,21 @@ Python 原型位于 `src/text_sandbox_engine/`。
 python -m unittest discover -s tests
 ```
 
+常用诊断命令：
+
+本地未安装包时，先让 Python 能找到 `src`。PowerShell 使用 `$env:PYTHONPATH='src'`，bash 使用 `PYTHONPATH=src`。
+
+```bash
+PYTHONPATH=src python -m text_sandbox_engine.cli content-validate --content examples/content
+PYTHONPATH=src python -m text_sandbox_engine.cli replay --state examples/minimal_world_state.json --content examples/content --commands examples/commands/playable_loop.json
+PYTHONPATH=src python -m text_sandbox_engine.cli scene-report --state examples/minimal_world_state.json --content examples/content
+PYTHONPATH=src python -m text_sandbox_engine.cli state-diff --before before.json --after after.json
+PYTHONPATH=src python -m text_sandbox_engine.cli changed-by --trace trace.json --path flags.met_market
+```
+
 ## Current Status
 
-项目处于阶段 4：持久化与迁移体系。
+项目处于阶段 5：调试工具与开发者体验。
 
 已完成：
 
@@ -74,5 +87,6 @@ python -m unittest discover -s tests
 9. 最小玩法模块：时间、空间、叙事、角色。
 10. 最小可玩循环：移动到市场、触发场景、执行选项、显示 NPC 场景。
 11. 版本化存档结构、模块版本校验、组件版本记录和旧格式迁移。
+12. 开发期诊断工具：内容校验、命令回放、场景候选分析和状态差异报告。
 
-下一步是进入阶段 5：调试工具与开发者体验。
+下一步是进入阶段 6：中世纪沙盒内容验证。

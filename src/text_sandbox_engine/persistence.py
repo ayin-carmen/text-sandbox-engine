@@ -64,7 +64,7 @@ def load_save(
     path: str | Path,
     known_modules: dict[str, str] | None = None,
 ) -> LoadedSave:
-    with Path(path).open("r", encoding="utf-8") as file:
+    with Path(path).open("r", encoding="utf-8-sig") as file:
         raw_data = json.load(file)
     if not isinstance(raw_data, dict):
         raise ValueError("save file must contain a JSON object")

@@ -2,6 +2,30 @@
 
 本文件按每次更新独立记录，不把后续提交合并进已有条目。
 
+## 2026-07-21 - 阶段 5 调试工具与开发者体验
+
+### 新增
+
+- 新增 `diagnostics.state_diff`，支持比较两个状态快照并输出字段级差异。
+- 新增 `diagnostics.changed_by`，支持从命令 trace 中定位某个状态字段由哪个命令修改。
+- 新增 `debug.py`，提供内容校验、命令回放、场景候选分析和状态差异报告能力。
+- 新增 `cli.py`，提供 `content-validate`、`replay`、`scene-report`、`state-diff`、`changed-by` 五个诊断命令。
+- 新增 `examples/commands/playable_loop.json` 命令回放样例。
+- 新增测试，覆盖命令回放、状态字段修改来源、场景过滤原因、状态差异和 CLI JSON 输出。
+- 新增 UTF-8 BOM JSON 读取测试，覆盖 Windows 工具写出的 JSON 文件。
+
+### 变更
+
+- 在 `pyproject.toml` 中注册 `text-sandbox-engine` 命令行入口。
+- 内容与存档读取改为兼容 UTF-8 BOM。
+- 更新 README，补充阶段 5 状态和常用诊断命令。
+
+### 验证
+
+- 通过 `python -m compileall src tests`。
+- 通过 `python -m unittest discover -s tests`，共 22 个测试。
+- 通过 `content-validate`、`scene-report`、`replay`、`state-diff`、`changed-by` 五个 CLI 命令的本地源码运行验证。
+
 ## 2026-07-21 - 阶段 4 持久化与迁移体系
 
 ### 新增

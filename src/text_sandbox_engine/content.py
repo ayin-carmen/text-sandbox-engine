@@ -135,7 +135,7 @@ def _scene_files(root: Path) -> list[Path]:
 
 
 def _load_json(path: Path) -> dict[str, Any]:
-    with path.open("r", encoding="utf-8") as file:
+    with path.open("r", encoding="utf-8-sig") as file:
         data = json.load(file)
     if not isinstance(data, dict):
         raise ValueError(f"{path} must contain a JSON object")
