@@ -1,0 +1,32 @@
+{
+  "id": "scene.greybrook.market_baker",
+  "scope": {
+    "location": "location.market_square"
+  },
+  "priority": 15,
+  "conditions": [
+    {
+      "rule": "actor.is_present",
+      "args": ["actor.elda"]
+    },
+    {
+      "rule": "flag.is_false",
+      "args": ["accepted_bread_delivery"]
+    }
+  ],
+  "content_tags": ["npc", "market", "relationship"],
+  "text": "面包师艾尔达把一篮黑麦面包推到摊前，请你顺路送去小教堂院。",
+  "choices": [
+    {
+      "text": "答应帮她送面包",
+      "effects": [
+        {
+          "effect": "flag.set",
+          "args": ["accepted_bread_delivery", true]
+        }
+      ]
+    }
+  ],
+  "cooldown": {},
+  "repeat_policy": "once"
+}

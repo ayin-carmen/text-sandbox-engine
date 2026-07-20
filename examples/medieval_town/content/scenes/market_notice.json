@@ -1,0 +1,36 @@
+{
+  "id": "scene.greybrook.market_notice",
+  "scope": {
+    "location": "location.market_square"
+  },
+  "priority": 20,
+  "conditions": [
+    {
+      "rule": "time.period_in",
+      "args": ["morning", "afternoon"]
+    },
+    {
+      "rule": "flag.is_false",
+      "args": ["heard_market_notice"]
+    }
+  ],
+  "content_tags": ["market", "notice"],
+  "text": "广场边的告示牌贴着新羊皮纸：领主塔楼暂停接见，面包师正在招人送货。",
+  "choices": [
+    {
+      "text": "读完整张告示",
+      "effects": [
+        {
+          "effect": "flag.set",
+          "args": ["heard_market_notice", true]
+        },
+        {
+          "effect": "time.advance",
+          "args": [1]
+        }
+      ]
+    }
+  ],
+  "cooldown": {},
+  "repeat_policy": "once"
+}

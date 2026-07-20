@@ -1,0 +1,32 @@
+{
+  "id": "scene.greybrook.west_gate_guard",
+  "scope": {
+    "location": "location.west_gate"
+  },
+  "priority": 10,
+  "conditions": [
+    {
+      "rule": "actor.is_present",
+      "args": ["actor.osric"]
+    },
+    {
+      "rule": "flag.is_false",
+      "args": ["met_guard"]
+    }
+  ],
+  "content_tags": ["intro", "guard", "gate"],
+  "text": "守卫奥斯里克抬起一只手，问你从哪条路来，又提醒你塔楼今日不接见外人。",
+  "choices": [
+    {
+      "text": "如实回答来路",
+      "effects": [
+        {
+          "effect": "flag.set",
+          "args": ["met_guard", true]
+        }
+      ]
+    }
+  ],
+  "cooldown": {},
+  "repeat_policy": "once"
+}

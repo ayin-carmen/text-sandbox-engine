@@ -2,6 +2,29 @@
 
 本文件按每次更新独立记录，不把后续提交合并进已有条目。
 
+## 2026-07-21 - 阶段 6 中世纪沙盒内容验证
+
+### 新增
+
+- 新增 `examples/medieval_town/` 中世纪小镇垂直切片内容包。
+- 新增四个地点：西门、集市广场、小教堂院、领主塔楼。
+- 新增两个 NPC：守卫奥斯里克、面包师艾尔达。
+- 新增四个场景：西门守卫、集市告示、面包师送货请求、小教堂送货。
+- 新增垂直切片命令回放样例 `examples/medieval_town/commands/vertical_slice.json`。
+- 新增阶段 6 验证报告、模块缺口清单和数据格式修订建议。
+- 新增测试，覆盖中世纪内容校验、垂直切片回放、准入失败不改状态和阶段 6 文档存在性。
+
+### 变更
+
+- 更新 README，标记项目进入阶段 6。
+
+### 验证
+
+- 通过 `python -m compileall src tests`。
+- 通过 `python -m unittest discover -s tests`，共 27 个测试。
+- 通过 `examples/medieval_town/` 全部 JSON 文件解析。
+- 通过中世纪内容包 `content-validate` 和 `replay` CLI 验证。
+
 ## 2026-07-21 - 阶段 5 调试工具与开发者体验
 
 ### 新增

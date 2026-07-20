@@ -28,6 +28,9 @@
 
 - `examples/minimal_world_state.json`
 - `examples/traces/travel_to_market_trace.json`
+- `examples/medieval_town/world_state.json`
+- `examples/medieval_town/content/scenes/*.json`
+- `examples/medieval_town/commands/vertical_slice.json`
 
 ## Python Prototype
 
@@ -51,6 +54,7 @@ Python 原型位于 `src/text_sandbox_engine/`。
 14. NPC 在场判断与最小可玩循环。
 15. 版本化存档 envelope、模块版本记录、组件 schema version 和迁移报告。
 16. 开发期诊断 CLI：内容校验、命令回放、场景候选报告和状态差异对比。
+17. 中世纪小镇垂直切片内容包与验证报告。
 
 运行测试：
 
@@ -72,7 +76,7 @@ PYTHONPATH=src python -m text_sandbox_engine.cli changed-by --trace trace.json -
 
 ## Current Status
 
-项目处于阶段 5：调试工具与开发者体验。
+项目处于阶段 6：中世纪沙盒内容验证。
 
 已完成：
 
@@ -88,5 +92,6 @@ PYTHONPATH=src python -m text_sandbox_engine.cli changed-by --trace trace.json -
 10. 最小可玩循环：移动到市场、触发场景、执行选项、显示 NPC 场景。
 11. 版本化存档结构、模块版本校验、组件版本记录和旧格式迁移。
 12. 开发期诊断工具：内容校验、命令回放、场景候选分析和状态差异报告。
+13. 中世纪小镇垂直切片内容包、玩法反馈报告、模块缺口清单和数据格式修订建议。
 
-下一步是进入阶段 6：中世纪沙盒内容验证。
+下一步是进入阶段 7：正式玩法模块扩展。

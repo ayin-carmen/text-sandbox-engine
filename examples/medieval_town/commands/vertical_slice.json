@@ -1,0 +1,46 @@
+[
+  {
+    "type": "narrative.choose",
+    "actor": "actor.player",
+    "target": "scene.greybrook.west_gate_guard",
+    "args": {
+      "choice_index": 0
+    }
+  },
+  {
+    "type": "space.travel_to",
+    "actor": "actor.player",
+    "target": "location.market_square",
+    "args": {}
+  },
+  {
+    "type": "narrative.choose",
+    "actor": "actor.player",
+    "target": "scene.greybrook.market_notice",
+    "args": {
+      "choice_index": 0
+    }
+  },
+  {
+    "type": "narrative.choose",
+    "actor": "actor.player",
+    "target": "scene.greybrook.market_baker",
+    "args": {
+      "choice_index": 0
+    }
+  },
+  {
+    "type": "space.travel_to",
+    "actor": "actor.player",
+    "target": "location.chapel_yard",
+    "args": {}
+  },
+  {
+    "type": "narrative.choose",
+    "actor": "actor.player",
+    "target": "scene.greybrook.chapel_delivery",
+    "args": {
+      "choice_index": 0
+    }
+  }
+]

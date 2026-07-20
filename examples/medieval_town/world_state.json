@@ -1,0 +1,154 @@
+{
+  "schema_version": 1,
+  "runtime_version": "0.0.0-phase6",
+  "seed": 240721,
+  "entities": {
+    "actor.player": {
+      "id": "actor.player",
+      "type": "actor",
+      "tags": ["player"],
+      "components": {
+        "profile": {
+          "name": "旅人"
+        },
+        "location": {
+          "current": "location.west_gate"
+        },
+        "inventory": {
+          "items": []
+        }
+      },
+      "metadata": {}
+    },
+    "actor.elda": {
+      "id": "actor.elda",
+      "type": "actor",
+      "tags": ["npc", "baker"],
+      "components": {
+        "profile": {
+          "name": "艾尔达"
+        },
+        "location": {
+          "current": "location.market_square"
+        },
+        "relationship": {
+          "trust": 0
+        }
+      },
+      "metadata": {}
+    },
+    "actor.osric": {
+      "id": "actor.osric",
+      "type": "actor",
+      "tags": ["npc", "guard"],
+      "components": {
+        "profile": {
+          "name": "奥斯里克"
+        },
+        "location": {
+          "current": "location.west_gate"
+        },
+        "relationship": {
+          "trust": 0
+        }
+      },
+      "metadata": {}
+    },
+    "location.west_gate": {
+      "id": "location.west_gate",
+      "type": "location",
+      "tags": ["gate", "public"],
+      "components": {
+        "description": {
+          "name": "西门",
+          "text": "木栅门外的泥路还带着昨夜的雨痕，守卫靠在门楼阴影里。"
+        },
+        "map_node": {
+          "region": "greybrook",
+          "connections": ["location.market_square"]
+        }
+      },
+      "metadata": {}
+    },
+    "location.market_square": {
+      "id": "location.market_square",
+      "type": "location",
+      "tags": ["market", "public", "trade"],
+      "components": {
+        "description": {
+          "name": "集市广场",
+          "text": "木摊、布棚和牲口栏挤在石井周围，钟声从小教堂方向传来。"
+        },
+        "map_node": {
+          "region": "greybrook",
+          "connections": ["location.west_gate", "location.chapel_yard", "location.lord_keep"]
+        }
+      },
+      "metadata": {}
+    },
+    "location.chapel_yard": {
+      "id": "location.chapel_yard",
+      "type": "location",
+      "tags": ["chapel", "public"],
+      "components": {
+        "description": {
+          "name": "小教堂院",
+          "text": "低矮石墙围出一片安静院落，风里有蜡油和潮湿青草的气味。"
+        },
+        "map_node": {
+          "region": "greybrook",
+          "connections": ["location.market_square"]
+        }
+      },
+      "metadata": {}
+    },
+    "location.lord_keep": {
+      "id": "location.lord_keep",
+      "type": "location",
+      "tags": ["keep", "restricted"],
+      "components": {
+        "description": {
+          "name": "领主塔楼",
+          "text": "塔楼大门紧闭，门前的纹章盾牌被雨水洗得发亮。"
+        },
+        "map_node": {
+          "region": "greybrook",
+          "connections": ["location.market_square"]
+        },
+        "access": {
+          "blocked": true
+        }
+      },
+      "metadata": {}
+    }
+  },
+  "globals": {
+    "clock": {
+      "day": 1,
+      "period": "morning",
+      "tick": 0
+    }
+  },
+  "flags": {
+    "met_guard": false,
+    "heard_market_notice": false,
+    "accepted_bread_delivery": false,
+    "visited_chapel": false
+  },
+  "history": [],
+  "cooldowns": {},
+  "indexes": {
+    "entities_by_type": {
+      "actor": ["actor.player", "actor.elda", "actor.osric"],
+      "location": [
+        "location.west_gate",
+        "location.market_square",
+        "location.chapel_yard",
+        "location.lord_keep"
+      ]
+    }
+  },
+  "diagnostics_state": {
+    "command_index": 0
+  }
+}

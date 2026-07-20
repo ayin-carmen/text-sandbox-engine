@@ -1,0 +1,28 @@
+{
+  "id": "scene.greybrook.chapel_delivery",
+  "scope": {
+    "location": "location.chapel_yard"
+  },
+  "priority": 10,
+  "conditions": [
+    {
+      "rule": "flag.is_false",
+      "args": ["visited_chapel"]
+    }
+  ],
+  "content_tags": ["chapel", "errand"],
+  "text": "小教堂院里，修士接过面包篮，低声说艾尔达总是记得清晨的施舍。",
+  "choices": [
+    {
+      "text": "把这句话记下",
+      "effects": [
+        {
+          "effect": "flag.set",
+          "args": ["visited_chapel", true]
+        }
+      ]
+    }
+  ],
+  "cooldown": {},
+  "repeat_policy": "once"
+}
