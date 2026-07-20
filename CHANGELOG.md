@@ -2,6 +2,28 @@
 
 本文件按每次更新独立记录，不把后续提交合并进已有条目。
 
+## 2026-07-20 - 阶段 2 内容仓库与场景编排
+
+### 新增
+
+- 新增 `ContentRepository`，支持从内容目录加载 JSON 场景并执行基础校验。
+- 新增 `ContentRepository` 包级公开导出。
+- 新增场景候选筛选逻辑，支持地点 scope、场景条件规则、优先级排序和候选报告。
+- 新增 `examples/content/scenes/market_intro.json` 场景样例。
+- 新增 `time.period_in` 内置规则，用于场景条件判断。
+- 新增测试，覆盖移动到市场后从内容仓库选中 `scene.market_intro`，以及未知规则的内容校验失败。
+
+### 变更
+
+- 将 `SceneOrchestrator` 从阶段 1 占位实现升级为真实场景选择边界。
+- 更新 `Runtime.from_file`，支持可选传入 `content_path`。
+- 更新 README，标记项目进入阶段 2。
+
+### 验证
+
+- 通过 `python -m compileall src tests`。
+- 通过 `python -m unittest discover -s tests`，共 6 个测试。
+
 ## 2026-07-20 - 更新日志改为逐次记录
 
 ### 新增

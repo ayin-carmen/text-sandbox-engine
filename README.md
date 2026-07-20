@@ -41,9 +41,11 @@
 4. `CommandPipeline` 命令执行管线。
 5. `RuleEngine` 与 `EffectEngine`。
 6. `Transaction` 与 `ChangeSet`。
-7. `SceneOrchestrator` 占位边界。
+7. `SceneOrchestrator` 场景选择边界。
 8. JSON 存档读写。
 9. 基础内置命令、规则和效果。
+10. `ContentRepository` 内容仓库。
+11. 基础场景加载、校验、筛选和候选报告。
 
 运行测试：
 
@@ -53,7 +55,7 @@ python -m unittest discover -s tests
 
 ## Current Status
 
-项目处于阶段 1：核心运行时 Python 原型。
+项目处于阶段 2：内容仓库与场景编排。
 
 已完成：
 
@@ -64,5 +66,6 @@ python -m unittest discover -s tests
 5. 命令执行 trace 样例。
 6. 最小 Python 运行时原型。
 7. 命令执行、规则判断、效果应用、事务提交和存档读写测试。
+8. JSON 场景内容加载、基础校验和场景候选报告。
 
-下一步是进入阶段 2：内容仓库与场景编排。
+下一步是进入阶段 3：最小玩法模块。

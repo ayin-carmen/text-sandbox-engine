@@ -10,8 +10,12 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from text_sandbox_engine import Runtime
+from text_sandbox_engine.builtins import register_builtins
+from text_sandbox_engine.content import ContentRepository
+from text_sandbox_engine.registry import Registry
 
 EXAMPLE_STATE = ROOT / "examples" / "minimal_world_state.json"
+EXAMPLE_CONTENT = ROOT / "examples" / "content"
 
 
 class RuntimeTests(unittest.TestCase):
@@ -41,6 +45,25 @@ class RuntimeTests(unittest.TestCase):
         self.assertTrue(all(rule.passed for rule in result.trace.rule_results))
         self.assertEqual(len(result.trace.effect_results), 2)
         self.assertEqual(len(result.trace.changeset.changes), 2)
+
+    def test_travel_command_selects_matching_scene_from_content(self) -> None:
+        runtime = Runtime.from_file(EXAMPLE_STATE, content_path=EXAMPLE_CONTENT)
+
+        result = runtime.execute(
+            {
+                "type": "space.travel_to",
+                "actor": "actor.player",
+                "target": "location.market",
+                "args": {},
+            }
+        )
+
+        report = result.trace.presentation.scene_candidate_report
+        self.assertEqual(result.status, "succeeded")
+        self.assertEqual(result.trace.presentation.selected_scene, "scene.market_intro")
+        self.assertEqual(result.trace.presentation.scene["text"], "你第一次走进市场，空气里混着面包、湿羊毛和铜币的气味。")
+        self.assertEqual(report["selected"], "scene.market_intro")
+        self.assertEqual(report["filtered"], [])
 
     def test_failed_rule_produces_no_state_changes(self) -> None:
         runtime = self.load_runtime()
@@ -81,6 +104,27 @@ class RuntimeTests(unittest.TestCase):
     def test_example_state_is_valid_json(self) -> None:
         with EXAMPLE_STATE.open("r", encoding="utf-8") as file:
             self.assertIsInstance(json.load(file), dict)
+
+    def test_content_validation_rejects_unknown_rule(self) -> None:
+        registry = Registry()
+        register_builtins(registry)
+        repository = ContentRepository(
+            scenes=[
+                {
+                    "id": "scene.invalid_rule",
+                    "scope": {},
+                    "priority": 1,
+                    "conditions": [{"rule": "missing.rule", "args": []}],
+                    "text": "invalid",
+                    "choices": [{"text": "ok", "effects": []}],
+                }
+            ]
+        )
+
+        report = repository.validate(registry=registry)
+
+        self.assertFalse(report.passed)
+        self.assertIn("unknown rule: missing.rule", report.issues[0].message)
 
 
 if __name__ == "__main__":

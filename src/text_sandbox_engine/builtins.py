@@ -14,6 +14,7 @@ def register_builtins(registry: Registry) -> None:
     registry.register_rule("space.location_connected", rule_location_connected)
     registry.register_rule("space.location_accessible", rule_location_accessible)
     registry.register_rule("flag.is_false", rule_flag_is_false)
+    registry.register_rule("time.period_in", rule_time_period_in)
     registry.register_effect("space.move_entity", effect_move_entity)
     registry.register_effect("time.advance", effect_advance_time)
     registry.register_effect("flag.set", effect_set_flag)
@@ -100,6 +101,19 @@ def rule_flag_is_false(state: dict[str, Any], args: list[Any], context: Any) -> 
         args=args,
         reason="flag is false" if not value else "flag is true",
         observed={"value": value},
+    )
+
+
+def rule_time_period_in(state: dict[str, Any], args: list[Any], context: Any) -> RuleResult:
+    current_period = state.get("globals", {}).get("clock", {}).get("period")
+    allowed = [str(item) for item in args]
+    passed = current_period in allowed
+    return RuleResult(
+        passed=passed,
+        rule_type="time.period_in",
+        args=args,
+        reason="time period is allowed" if passed else "time period is not allowed",
+        observed={"current_period": current_period, "allowed": allowed},
     )
 
 

@@ -90,6 +90,7 @@ class EffectResult:
 @dataclass(frozen=True)
 class Presentation:
     selected_scene: str | None = None
+    scene: dict[str, Any] | None = None
     scene_candidate_report: dict[str, Any] = field(default_factory=dict)
 
 

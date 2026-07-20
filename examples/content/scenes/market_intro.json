@@ -1,0 +1,36 @@
+{
+  "id": "scene.market_intro",
+  "scope": {
+    "location": "location.market"
+  },
+  "priority": 10,
+  "conditions": [
+    {
+      "rule": "time.period_in",
+      "args": ["morning", "afternoon"]
+    },
+    {
+      "rule": "flag.is_false",
+      "args": ["met_market"]
+    }
+  ],
+  "content_tags": ["intro", "location"],
+  "text": "你第一次走进市场，空气里混着面包、湿羊毛和铜币的气味。",
+  "choices": [
+    {
+      "text": "四处看看",
+      "effects": [
+        {
+          "effect": "flag.set",
+          "args": ["met_market", true]
+        },
+        {
+          "effect": "time.advance",
+          "args": [1]
+        }
+      ]
+    }
+  ],
+  "cooldown": {},
+  "repeat_policy": "once"
+}

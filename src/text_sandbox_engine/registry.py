@@ -42,3 +42,9 @@ class Registry:
             return self._effects[effect_type]
         except KeyError as exc:
             raise KeyError(f"unknown effect: {effect_type}") from exc
+
+    def has_rule(self, rule_type: str) -> bool:
+        return rule_type in self._rules
+
+    def has_effect(self, effect_type: str) -> bool:
+        return effect_type in self._effects

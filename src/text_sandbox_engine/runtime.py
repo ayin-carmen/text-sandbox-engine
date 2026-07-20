@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from .builtins import register_builtins
+from .content import ContentRepository
 from .models import Command, CommandResult
 from .persistence import load_world_state, save_world_state
 from .pipeline import CommandPipeline
@@ -19,11 +20,17 @@ class Runtime:
         self,
         world_state: dict[str, Any],
         registry: Registry | None = None,
+        content_repository: ContentRepository | None = None,
         scene_orchestrator: SceneOrchestrator | None = None,
     ) -> None:
         self.registry = registry or Registry()
         register_builtins(self.registry)
+        self.content_repository = content_repository or ContentRepository()
         self.state_store = StateStore(world_state)
+        scene_orchestrator = scene_orchestrator or SceneOrchestrator(
+            content_repository=self.content_repository,
+            registry=self.registry,
+        )
         self.pipeline = CommandPipeline(
             self.state_store,
             self.registry,
@@ -31,8 +38,19 @@ class Runtime:
         )
 
     @classmethod
-    def from_file(cls, path: str | Path) -> "Runtime":
-        return cls(load_world_state(path))
+    def from_file(cls, path: str | Path, content_path: str | Path | None = None) -> "Runtime":
+        registry = Registry()
+        register_builtins(registry)
+        content_repository = (
+            ContentRepository.from_path(content_path, registry=registry)
+            if content_path
+            else ContentRepository()
+        )
+        return cls(
+            load_world_state(path),
+            registry=registry,
+            content_repository=content_repository,
+        )
 
     def execute(self, command: Command | dict[str, Any]) -> CommandResult:
         return self.pipeline.execute(command)
