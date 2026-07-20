@@ -12,6 +12,7 @@ sys.path.insert(0, str(ROOT / "src"))
 from text_sandbox_engine import Runtime
 from text_sandbox_engine.builtins import register_builtins
 from text_sandbox_engine.content import ContentRepository
+from text_sandbox_engine.persistence import load_save
 from text_sandbox_engine.registry import Registry
 
 EXAMPLE_STATE = ROOT / "examples" / "minimal_world_state.json"
@@ -147,6 +148,93 @@ class RuntimeTests(unittest.TestCase):
             loaded = Runtime.load_game(save_path)
 
         self.assertEqual(loaded.snapshot(), runtime.snapshot())
+
+    def test_save_file_records_metadata_versions(self) -> None:
+        runtime = self.load_runtime()
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            save_path = Path(tmpdir) / "save.json"
+            report = runtime.save_game(save_path)
+            with save_path.open("r", encoding="utf-8") as file:
+                raw_save = json.load(file)
+            loaded = load_save(save_path)
+
+        self.assertIn("save_metadata", raw_save)
+        self.assertIn("world_state", raw_save)
+        self.assertEqual(report.metadata.save_schema_version, 2)
+        self.assertEqual(loaded.metadata.engine_version, "0.4.0")
+        self.assertEqual(loaded.metadata.enabled_modules, ["actor", "narrative", "space", "time"])
+        self.assertEqual(loaded.metadata.module_versions["space"], "0.1.0")
+        self.assertEqual(loaded.metadata.component_schema_versions["location"], 1)
+        self.assertEqual(loaded.metadata.random_state["seed"], 17020)
+
+    def test_legacy_world_state_loads_with_migration_report(self) -> None:
+        with EXAMPLE_STATE.open("r", encoding="utf-8") as file:
+            legacy_state = json.load(file)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            save_path = Path(tmpdir) / "legacy.json"
+            with save_path.open("w", encoding="utf-8") as file:
+                json.dump(legacy_state, file)
+            runtime = Runtime.load_game(save_path)
+
+        self.assertEqual(runtime.snapshot(), legacy_state)
+        self.assertTrue(runtime.last_load_report.migrated)
+        self.assertEqual(
+            [step.name for step in runtime.last_load_report.steps],
+            ["bare_world_state_to_save_envelope", "save_schema_1_to_2"],
+        )
+
+    def test_missing_module_in_save_reports_clear_error(self) -> None:
+        runtime = self.load_runtime()
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            save_path = Path(tmpdir) / "save.json"
+            runtime.save_game(save_path)
+            with save_path.open("r", encoding="utf-8") as file:
+                save_data = json.load(file)
+            save_data["save_metadata"]["enabled_modules"].append("missing.module")
+            save_data["save_metadata"]["module_versions"]["missing.module"] = "0.1.0"
+            with save_path.open("w", encoding="utf-8") as file:
+                json.dump(save_data, file)
+
+            with self.assertRaisesRegex(ValueError, "save requires missing modules: missing.module"):
+                Runtime.load_game(save_path)
+
+    def test_module_version_mismatch_reports_clear_error(self) -> None:
+        runtime = self.load_runtime()
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            save_path = Path(tmpdir) / "save.json"
+            runtime.save_game(save_path)
+            with save_path.open("r", encoding="utf-8") as file:
+                save_data = json.load(file)
+            save_data["save_metadata"]["module_versions"]["space"] = "9.9.9"
+            with save_path.open("w", encoding="utf-8") as file:
+                json.dump(save_data, file)
+
+            with self.assertRaisesRegex(ValueError, "save module version mismatch"):
+                Runtime.load_game(save_path)
+
+    def test_loaded_versioned_save_can_continue_deterministically(self) -> None:
+        runtime = self.load_runtime()
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            save_path = Path(tmpdir) / "save.json"
+            runtime.save_game(save_path)
+            loaded = Runtime.load_game(save_path)
+            result = loaded.execute(
+                {
+                    "type": "space.travel_to",
+                    "actor": "actor.player",
+                    "target": "location.market",
+                    "args": {},
+                }
+            )
+
+        self.assertEqual(result.status, "succeeded")
+        self.assertEqual(result.trace.command_id, "cmd.000001")
+        self.assertEqual(result.state["globals"]["clock"]["tick"], 1)
 
     def test_example_state_is_valid_json(self) -> None:
         with EXAMPLE_STATE.open("r", encoding="utf-8") as file:

@@ -49,6 +49,7 @@ Python 原型位于 `src/text_sandbox_engine/`。
 12. `time`、`space`、`narrative`、`actor` 最小玩法模块。
 13. `narrative.choose` 场景选项执行命令。
 14. NPC 在场判断与最小可玩循环。
+15. 版本化存档 envelope、模块版本记录、组件 schema version 和迁移报告。
 
 运行测试：
 
@@ -58,7 +59,7 @@ python -m unittest discover -s tests
 
 ## Current Status
 
-项目处于阶段 3：最小玩法模块。
+项目处于阶段 4：持久化与迁移体系。
 
 已完成：
 
@@ -72,5 +73,6 @@ python -m unittest discover -s tests
 8. JSON 场景内容加载、基础校验和场景候选报告。
 9. 最小玩法模块：时间、空间、叙事、角色。
 10. 最小可玩循环：移动到市场、触发场景、执行选项、显示 NPC 场景。
+11. 版本化存档结构、模块版本校验、组件版本记录和旧格式迁移。
 
-下一步是进入阶段 4：持久化与迁移体系。
+下一步是进入阶段 5：调试工具与开发者体验。

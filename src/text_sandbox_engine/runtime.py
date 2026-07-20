@@ -8,7 +8,7 @@ from typing import Any
 from .builtins import register_builtins
 from .content import ContentRepository
 from .models import Command, CommandResult
-from .persistence import load_world_state, save_world_state
+from .persistence import SaveReport, load_save, load_world_state, save_world_state
 from .pipeline import CommandPipeline
 from .registry import Registry
 from .scene import SceneOrchestrator
@@ -37,6 +37,7 @@ class Runtime:
             scene_orchestrator=scene_orchestrator,
             content_repository=self.content_repository,
         )
+        self.last_load_report = None
 
     @classmethod
     def from_file(cls, path: str | Path, content_path: str | Path | None = None) -> "Runtime":
@@ -59,9 +60,12 @@ class Runtime:
     def snapshot(self) -> dict[str, Any]:
         return self.state_store.snapshot()
 
-    def save_game(self, path: str | Path) -> None:
-        save_world_state(path, self.snapshot())
+    def save_game(self, path: str | Path) -> SaveReport:
+        return save_world_state(path, self.snapshot())
 
     @classmethod
     def load_game(cls, path: str | Path) -> "Runtime":
-        return cls.from_file(path)
+        loaded_save = load_save(path)
+        runtime = cls(loaded_save.world_state)
+        runtime.last_load_report = loaded_save.migration_report
+        return runtime

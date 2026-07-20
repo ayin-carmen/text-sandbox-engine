@@ -2,6 +2,29 @@
 
 本文件按每次更新独立记录，不把后续提交合并进已有条目。
 
+## 2026-07-21 - 阶段 4 持久化与迁移体系
+
+### 新增
+
+- 新增版本化存档 envelope，将 `save_metadata` 与 `world_state` 分离保存。
+- 新增 `SaveMetadata`、`SaveReport` 和 `LoadedSave` 存档报告模型。
+- 新增 `MigrationRegistry` 与 `MigrationReport`，支持基础存档 schema 迁移。
+- 新增模块版本记录和组件 schema version 收集。
+- 新增旧版裸 world state 存档兼容读取和迁移报告。
+- 新增缺失模块、模块版本不兼容的读档校验。
+- 新增测试，覆盖存档元数据、旧格式迁移、缺失模块报错、模块版本不兼容和读档后继续执行命令。
+
+### 变更
+
+- `Runtime.save_game` 现在返回 `SaveReport`。
+- `Runtime.load_game` 会记录最近一次迁移报告到 `last_load_report`。
+- 更新 README，标记项目进入阶段 4。
+
+### 验证
+
+- 通过 `python -m compileall src tests`。
+- 通过 `python -m unittest discover -s tests`，共 12 个测试。
+
 ## 2026-07-21 - 阶段 3 最小玩法模块
 
 ### 新增
