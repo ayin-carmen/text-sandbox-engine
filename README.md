@@ -29,9 +29,31 @@
 - `examples/minimal_world_state.json`
 - `examples/traces/travel_to_market_trace.json`
 
+## Python Prototype
+
+阶段 1 原型位于 `src/text_sandbox_engine/`。
+
+当前已实现：
+
+1. `Runtime` 运行时入口。
+2. `StateStore` 世界状态仓库。
+3. `Registry` 命令、规则、效果注册表。
+4. `CommandPipeline` 命令执行管线。
+5. `RuleEngine` 与 `EffectEngine`。
+6. `Transaction` 与 `ChangeSet`。
+7. `SceneOrchestrator` 占位边界。
+8. JSON 存档读写。
+9. 基础内置命令、规则和效果。
+
+运行测试：
+
+```bash
+python -m unittest discover -s tests
+```
+
 ## Current Status
 
-项目处于阶段 0：架构冻结与技术验证。
+项目处于阶段 1：核心运行时 Python 原型。
 
 已完成：
 
@@ -40,5 +62,7 @@
 3. 内容 schema 草案。
 4. 最小世界状态样例。
 5. 命令执行 trace 样例。
+6. 最小 Python 运行时原型。
+7. 命令执行、规则判断、效果应用、事务提交和存档读写测试。
 
-下一步是进入阶段 1：核心运行时 Python 原型。
+下一步是进入阶段 2：内容仓库与场景编排。

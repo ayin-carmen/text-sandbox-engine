@@ -4,6 +4,10 @@
 
 ### 新增
 
+- 新增阶段 1 核心运行时 Python 原型，包含 `Runtime`、`StateStore`、`Registry`、`CommandPipeline`、`RuleEngine`、`EffectEngine`、`Transaction`、`SceneOrchestrator` 和 JSON 存档读写。
+- 新增内置 `space.travel_to` 命令，以及地点连接、地点准入、旗标判断、移动实体、推进时间、设置旗标等基础规则和效果。
+- 新增单元测试，覆盖成功命令执行、规则失败不改状态、存档读档 roundtrip 和样例 JSON 解析。
+- 新增 `.gitignore`，忽略本地工具目录、Python 缓存和构建产物。
 - 新增文字沙盒引擎阶段 0 技术验证包。
 - 新增核心接口草案，用于在 Python 原型实现前冻结第一版运行时边界。
 - 新增世界状态、实体内容和场景内容的 JSON Schema 草案。
@@ -11,4 +15,5 @@
 
 ### 变更
 
+- 更新 README，补充阶段 1 原型状态、项目结构和测试运行方式。
 - 更新 README，补充当前阶段 0 状态和仓库结构说明。
