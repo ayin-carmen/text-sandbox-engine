@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.local/text-sandbox-engine/world_state.schema.json",
+  "title": "WorldState",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "runtime_version",
+    "seed",
+    "entities",
+    "globals",
+    "flags",
+    "history",
+    "cooldowns",
+    "indexes",
+    "diagnostics_state"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "runtime_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "seed": {
+      "type": "integer"
+    },
+    "entities": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "../content/entity.schema.json"
+      }
+    },
+    "globals": {
+      "type": "object"
+    },
+    "flags": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "boolean"
+      }
+    },
+    "history": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "cooldowns": {
+      "type": "object"
+    },
+    "indexes": {
+      "type": "object"
+    },
+    "diagnostics_state": {
+      "type": "object"
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,137 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.local/text-sandbox-engine/scene.schema.json",
+  "title": "Scene",
+  "type": "object",
+  "required": ["id", "scope", "priority", "conditions", "text", "choices"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^scene\\.[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
+    },
+    "scope": {
+      "type": "object",
+      "properties": {
+        "location": {
+          "type": "string"
+        },
+        "actor": {
+          "type": "string"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": true
+    },
+    "priority": {
+      "type": "integer",
+      "default": 0
+    },
+    "conditions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/rule_ref"
+      },
+      "default": []
+    },
+    "content_tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true,
+      "default": []
+    },
+    "text": {
+      "type": "string",
+      "minLength": 1
+    },
+    "choices": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/choice"
+      }
+    },
+    "cooldown": {
+      "type": "object",
+      "default": {}
+    },
+    "repeat_policy": {
+      "type": "string",
+      "enum": ["always", "once", "cooldown"],
+      "default": "always"
+    }
+  },
+  "$defs": {
+    "choice": {
+      "type": "object",
+      "required": ["text", "effects"],
+      "properties": {
+        "text": {
+          "type": "string",
+          "minLength": 1
+        },
+        "visible_if": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/rule_ref"
+          },
+          "default": []
+        },
+        "effects": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/effect_ref"
+          },
+          "default": []
+        }
+      },
+      "additionalProperties": false
+    },
+    "rule_ref": {
+      "type": "object",
+      "required": ["rule", "args"],
+      "properties": {
+        "rule": {
+          "type": "string",
+          "minLength": 1
+        },
+        "args": {
+          "type": "array",
+          "default": []
+        },
+        "metadata": {
+          "type": "object",
+          "default": {}
+        }
+      },
+      "additionalProperties": false
+    },
+    "effect_ref": {
+      "type": "object",
+      "required": ["effect", "args"],
+      "properties": {
+        "effect": {
+          "type": "string",
+          "minLength": 1
+        },
+        "args": {
+          "type": "array",
+          "default": []
+        },
+        "metadata": {
+          "type": "object",
+          "default": {}
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

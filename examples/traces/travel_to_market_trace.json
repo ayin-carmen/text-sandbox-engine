@@ -1,0 +1,106 @@
+{
+  "command_trace": {
+    "command_id": "cmd.000001",
+    "command": {
+      "type": "space.travel_to",
+      "actor": "actor.player",
+      "target": "location.market",
+      "args": {}
+    },
+    "status": "succeeded",
+    "steps": [
+      {
+        "name": "normalize",
+        "status": "succeeded",
+        "details": {
+          "normalized_type": "space.travel_to"
+        }
+      },
+      {
+        "name": "validate_rules",
+        "status": "succeeded",
+        "rules": [
+          {
+            "rule": "space.location_connected",
+            "args": ["actor.player", "location.market"],
+            "passed": true,
+            "observed": {
+              "current_location": "location.town_square",
+              "connections": ["location.market"]
+            },
+            "reason": "目标地点与当前位置相连。"
+          },
+          {
+            "rule": "space.location_accessible",
+            "args": ["location.market"],
+            "passed": true,
+            "observed": {
+              "blocked": false
+            },
+            "reason": "目标地点当前可进入。"
+          }
+        ]
+      },
+      {
+        "name": "apply_effects",
+        "status": "succeeded",
+        "effects": [
+          {
+            "effect": "space.move_entity",
+            "args": ["actor.player", "location.market"],
+            "applied": true,
+            "changes": [
+              {
+                "path": "entities.actor.player.components.location.current",
+                "before": "location.town_square",
+                "after": "location.market"
+              }
+            ]
+          },
+          {
+            "effect": "time.advance",
+            "args": [1],
+            "applied": true,
+            "changes": [
+              {
+                "path": "globals.clock.tick",
+                "before": 0,
+                "after": 1
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "select_scene",
+        "status": "succeeded",
+        "scene_candidate_report": {
+          "selected": "scene.market_intro",
+          "candidates": [
+            {
+              "scene": "scene.market_intro",
+              "eligible": true,
+              "priority": 10,
+              "reason": "地点匹配，时间匹配，且 met_market 为 false。"
+            }
+          ],
+          "filtered": []
+        }
+      }
+    ],
+    "changeset": {
+      "changes": [
+        {
+          "path": "entities.actor.player.components.location.current",
+          "before": "location.town_square",
+          "after": "location.market"
+        },
+        {
+          "path": "globals.clock.tick",
+          "before": 0,
+          "after": 1
+        }
+      ]
+    }
+  }
+}

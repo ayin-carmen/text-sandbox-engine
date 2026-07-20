@@ -12,7 +12,33 @@
 - `docs/evolvable_text_sandbox_engine_plan.txt`  
   可演化文字沙盒引擎方案，用更直观的方式描述薄核心、命令、规则、效果和扩展模块的关系。
 
+- `docs/phase_0_core_interfaces.md`  
+  阶段 0 核心接口草案，冻结第一版 Python 原型需要遵守的运行时、状态、命令、规则、效果、事务、内容、场景、存档和诊断边界。
+
+- `docs/phase_0_content_schema_draft.md`  
+  阶段 0 内容 schema 草案，说明实体、世界状态、场景、规则引用和效果引用的最小数据形状。
+
+## Draft Schemas
+
+- `schemas/state/world_state.schema.json`
+- `schemas/content/entity.schema.json`
+- `schemas/content/scene.schema.json`
+
+## Examples
+
+- `examples/minimal_world_state.json`
+- `examples/traces/travel_to_market_trace.json`
+
 ## Current Status
 
-项目仍处于架构规划阶段，尚未进入 Python 原型实现。
+项目处于阶段 0：架构冻结与技术验证。
 
+已完成：
+
+1. 核心架构边界说明。
+2. 核心接口草案。
+3. 内容 schema 草案。
+4. 最小世界状态样例。
+5. 命令执行 trace 样例。
+
+下一步是进入阶段 1：核心运行时 Python 原型。

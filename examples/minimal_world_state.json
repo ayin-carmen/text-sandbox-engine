@@ -1,0 +1,77 @@
+{
+  "schema_version": 1,
+  "runtime_version": "0.0.0-phase0",
+  "seed": 17020,
+  "entities": {
+    "actor.player": {
+      "id": "actor.player",
+      "type": "actor",
+      "tags": ["player"],
+      "components": {
+        "profile": {
+          "name": "玩家"
+        },
+        "location": {
+          "current": "location.town_square"
+        },
+        "inventory": {
+          "items": []
+        }
+      },
+      "metadata": {}
+    },
+    "location.town_square": {
+      "id": "location.town_square",
+      "type": "location",
+      "tags": ["public", "town"],
+      "components": {
+        "description": {
+          "name": "城镇广场",
+          "text": "广场中央的石井旁聚着行人，几条街道从这里向外伸展。"
+        },
+        "map_node": {
+          "region": "town",
+          "connections": ["location.market"]
+        }
+      },
+      "metadata": {}
+    },
+    "location.market": {
+      "id": "location.market",
+      "type": "location",
+      "tags": ["public", "trade"],
+      "components": {
+        "description": {
+          "name": "市场",
+          "text": "石板路两旁挤满摊贩、布棚和讨价还价的人群。"
+        },
+        "map_node": {
+          "region": "town",
+          "connections": ["location.town_square"]
+        }
+      },
+      "metadata": {}
+    }
+  },
+  "globals": {
+    "clock": {
+      "day": 1,
+      "period": "morning",
+      "tick": 0
+    }
+  },
+  "flags": {
+    "met_market": false
+  },
+  "history": [],
+  "cooldowns": {},
+  "indexes": {
+    "entities_by_type": {
+      "actor": ["actor.player"],
+      "location": ["location.town_square", "location.market"]
+    }
+  },
+  "diagnostics_state": {
+    "command_index": 0
+  }
+}
