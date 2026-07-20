@@ -1,0 +1,427 @@
+可演化文字沙盒引擎方案
+========================
+
+一、设计目标
+------------
+
+当前阶段不应该急着确定完整游戏系统，例如地图系统、NPC 系统、衣物系统、法律系统、天气系统、任务系统等。
+
+因为在内容真正开始制作之前，很难准确判断哪些系统是必要的，哪些系统会变得复杂，哪些系统只是临时想法。
+
+因此第一版引擎的目标不是做出一个“已经固定玩法的游戏引擎”，而是做出一个“允许玩法规则不断长出来的底座”。
+
+核心原则：
+
+1. 引擎核心保持很小。
+2. 具体玩法系统通过模块接入。
+3. 数据尽量外置，用 JSON、YAML 或 TOML 描述。
+4. 所有行为走统一流程：命令 -> 条件 -> 效果 -> 状态。
+5. 引擎要能追踪每一步为什么成功、为什么失败、改了哪些状态。
+
+
+二、最小核心模型
+----------------
+
+整个引擎最底层只需要理解四个概念：
+
+1. State
+   世界状态。记录玩家、地点、时间、NPC、物品、旗标、任务等所有数据。
+
+2. Command
+   玩家或脚本发出的行为命令。例如：前往市场、等待、交谈、购买物品、穿戴衣物。
+
+3. Rule
+   条件判断。用于判断某个命令、事件或选项是否允许发生。
+
+4. Effect
+   状态变化。用于修改世界状态，例如改变位置、推进时间、增加好感、扣除金钱。
+
+最基本流程：
+
+    玩家输入 Command
+      -> 引擎检查 Rule
+      -> Rule 全部通过
+      -> 执行 Effect
+      -> 修改 State
+      -> 选择并展示下一个场景
+
+简化为：
+
+    Command -> Rule -> Effect -> State
+
+
+三、为什么这样设计
+------------------
+
+如果一开始就写死大量系统，例如：
+
+    TimeSystem
+    MapSystem
+    ActorSystem
+    EventSystem
+    SocialSystem
+    QuestSystem
+    InventorySystem
+    ClothingSystem
+    CrimeSystem
+
+看起来完整，但很容易出现问题：
+
+1. 系统边界不清楚。
+2. 不知道某个变量到底是谁修改的。
+3. 事件触发原因难以调试。
+4. 存档和版本迁移变复杂。
+5. 内容作者需要理解太多底层逻辑。
+6. 后期新增功能时容易牵一发动全身。
+
+因此第一版不应以“有多少系统”为中心，而应以“如何接入新系统”为中心。
+
+换句话说：
+
+    先做插座，不急着做所有电器。
+
+
+四、推荐架构
+------------
+
+建议第一版引擎结构：
+
+    Engine
+      |-- StateStore
+      |-- CommandRunner
+      |-- RuleRegistry
+      |-- EffectRegistry
+      |-- ContentLoader
+      |-- SceneSelector
+      |-- SaveLoad
+      |-- DebugTrace
+
+各部分职责：
+
+1. StateStore
+   保存世界状态。
+   它是游戏唯一的事实来源。
+
+2. CommandRunner
+   接收玩家或脚本命令，负责执行完整命令流程。
+
+3. RuleRegistry
+   注册所有可用条件。
+   例如：当前位置是否连接目标地点、NPC 是否在场、玩家是否有足够金钱。
+
+4. EffectRegistry
+   注册所有可用效果。
+   例如：移动玩家、推进时间、修改关系、设置旗标。
+
+5. ContentLoader
+   读取外部内容数据。
+   例如：地点、NPC、事件、物品、任务。
+
+6. SceneSelector
+   根据当前状态选择可展示事件或场景。
+
+7. SaveLoad
+   负责存档、读档、版本兼容。
+
+8. DebugTrace
+   记录每个命令执行过程。
+   包括：检查了哪些条件、哪些通过、哪些失败、执行了哪些效果、状态发生了什么变化。
+
+
+五、实体与组件
+--------------
+
+不要一开始把玩家、NPC、地点写成固定 Python 类。
+
+不推荐：
+
+    class Player:
+        health
+        charm
+        trauma
+        reputation
+        clothes
+        location
+
+因为后续新增字段会越来越多，类会变得臃肿。
+
+推荐使用实体 + 组件的方式。
+
+玩家可以是一个实体：
+
+    Entity: player
+      components:
+        stats
+        location
+        inventory
+        relationships
+        reputation
+        flags
+
+NPC 也可以是实体：
+
+    Entity: npc.elena
+      components:
+        profile
+        location
+        schedule
+        relationship_to_player
+        memories
+        faction
+
+地点也可以是实体：
+
+    Entity: location.market
+      components:
+        map_node
+        description
+        access_rules
+        event_pool
+        danger
+        tags
+
+这样以后想加入新功能，只需要给实体新增组件，而不是重写基础类。
+
+
+六、模块扩展方式
+----------------
+
+每个玩法模块只负责向引擎注册能力。
+
+例如，地图模块可以注册：
+
+    数据组件：
+      map_node
+      route
+      access_rules
+
+    命令：
+      travel_to
+
+    条件：
+      current_location_connected_to_target
+      target_location_is_open
+      player_can_enter_location
+
+    效果：
+      move_entity
+      discover_location
+
+时间模块可以注册：
+
+    数据组件：
+      clock
+      calendar
+      schedule
+
+    命令：
+      wait
+      sleep
+
+    条件：
+      time_is
+      period_in
+      day_is
+
+    效果：
+      advance_time
+      set_weather
+
+NPC 模块可以注册：
+
+    数据组件：
+      profile
+      relationship
+      memory
+      schedule
+
+    命令：
+      talk_to
+
+    条件：
+      npc_is_present
+      npc_trust_at_least
+      npc_remembers
+
+    效果：
+      add_relationship
+      add_memory
+      move_npc
+
+衣物模块可以注册：
+
+    数据组件：
+      clothing
+      outfit
+      body_slots
+
+    命令：
+      wear_item
+      remove_item
+
+    条件：
+      player_wearing_tag
+      slot_is_empty
+
+    效果：
+      equip_item
+      unequip_item
+      damage_clothing
+
+这意味着新增玩法时，不需要重写引擎主体，只需要注册新的数据、命令、条件和效果。
+
+
+七、数据驱动内容格式
+--------------------
+
+地点示例：
+
+    id: location.market
+    type: location
+    components:
+      map_node:
+        region: town
+        connections:
+          - location.town_square
+          - location.tavern
+          - location.tailor_guild
+
+      description:
+        name: 市场
+        text: 石板路两旁挤满摊贩、布棚和讨价还价的人群。
+
+      access_rules:
+        open_times:
+          - morning
+          - afternoon
+
+      tags:
+        - public
+        - urban
+        - trade
+
+事件示例：
+
+    id: event.market_intro
+    type: event
+    components:
+      trigger:
+        location: location.market
+        priority: 10
+        cooldown: once
+
+      conditions:
+        all:
+          - rule: time.period_in
+            args:
+              - morning
+              - afternoon
+          - rule: flag.false
+            args:
+              - met_market
+
+      scene:
+        text: 你第一次走进市场，空气里混着面包、湿羊毛和铜币的气味。
+        choices:
+          - text: 四处看看
+            effects:
+              - effect: set_flag
+                args:
+                  - met_market
+                  - true
+              - effect: advance_time
+                args:
+                  - 1
+
+移动命令示例：
+
+    command: travel_to
+    args:
+      target: location.market
+
+执行过程：
+
+    1. CommandRunner 收到 travel_to。
+    2. 地图模块提供规则，检查当前位置是否连接市场。
+    3. 时间模块提供规则，检查当前时间是否允许进入市场。
+    4. 条件通过后，执行 move_entity 和 advance_time。
+    5. StateStore 更新玩家位置和时间。
+    6. SceneSelector 根据新位置选择可展示事件。
+    7. DebugTrace 记录完整过程。
+
+
+八、第一版只做什么
+------------------
+
+第一版不要追求完整 DoL-like 系统。
+
+只做最小可运行底座：
+
+1. StateStore
+2. Entity + Component 数据结构
+3. CommandRunner
+4. RuleRegistry
+5. EffectRegistry
+6. ContentLoader
+7. SceneSelector
+8. SaveLoad
+9. DebugTrace
+
+然后只写三个演示模块：
+
+1. time
+   时间推进。
+
+2. space
+   地点和移动。
+
+3. narrative
+   事件选择和选项效果。
+
+第一版目标：
+
+    玩家可以在几个地点之间移动。
+    移动会推进时间。
+    不同地点和时间会出现不同事件。
+    玩家选择选项后，状态会改变。
+    游戏可以保存和读取。
+    调试日志能说明每一步发生了什么。
+
+
+九、后续系统如何自然生长
+------------------------
+
+不要提前决定所有系统。
+
+当内容制作中反复出现某类需求时，再把它提升为模块。
+
+例如：
+
+1. 如果很多事件都需要判断衣着，就制作 clothing 模块。
+2. 如果很多事件都需要 NPC 记住玩家行为，就制作 memory 模块。
+3. 如果很多地点都需要守卫检查，就制作 law/crime 模块。
+4. 如果很多任务都有阶段目标，就制作 quest 模块。
+5. 如果很多事件需要根据天气变化，就制作 weather 模块。
+
+判断一个功能是否应该成为系统的标准：
+
+1. 它是否会被很多内容重复使用？
+2. 它是否需要独立保存状态？
+3. 它是否需要独立规则判断？
+4. 它是否需要独立调试？
+5. 它是否会影响多个其他玩法？
+
+如果答案大多是“是”，再做成模块。
+
+
+十、最终一句话
+--------------
+
+这个项目第一阶段不应该设计成“完整游戏系统集合”。
+
+它应该设计成：
+
+    模块化、数据驱动、命令驱动、组件化状态的文字沙盒内核。
+
+核心不是提前知道所有规则，而是让新规则以后可以稳定、清晰、可调试地加入。
+
