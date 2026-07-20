@@ -1,14 +1,14 @@
-# Changelog
+# 更新日志
 
 ## 2026-07-20
 
-### Added
+### 新增
 
-- Added the phase 0 technical validation package for the text sandbox engine.
-- Added a core interface draft that freezes the first runtime boundaries before Python implementation.
-- Added draft JSON schemas for world state, entity content, and scene content.
-- Added minimal example data for an initial world state and a command trace.
+- 新增文字沙盒引擎阶段 0 技术验证包。
+- 新增核心接口草案，用于在 Python 原型实现前冻结第一版运行时边界。
+- 新增世界状态、实体内容和场景内容的 JSON Schema 草案。
+- 新增初始世界状态和命令执行 trace 的最小样例数据。
 
-### Changed
+### 变更
 
-- Updated README with the current phase 0 status and repository structure.
+- 更新 README，补充当前阶段 0 状态和仓库结构说明。
