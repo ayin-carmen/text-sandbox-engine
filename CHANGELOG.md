@@ -2,6 +2,26 @@
 
 本文件按每次更新独立记录，不把后续提交合并进已有条目。
 
+## 2026-07-21 - 阶段 3 最小玩法模块
+
+### 新增
+
+- 新增 `time`、`space`、`narrative`、`actor` 四个最小玩法模块，并通过默认模块注册入口接入运行时。
+- 新增 `narrative.choose` 命令，用于执行场景选项并产生可追踪效果。
+- 新增 `actor.is_present` 规则，用于判断 NPC 是否与玩家处于同一地点。
+- 新增市场 NPC `actor.mara` 和 `scene.market_vendor` 场景样例。
+- 新增最小可玩循环测试，覆盖移动、时间推进、场景触发、选项效果、NPC 在场判断和存档读档一致性。
+
+### 变更
+
+- 将原先集中在 `builtins.py` 的移动和时间能力拆分到独立玩法模块。
+
+### 验证
+
+- 通过 `python -m compileall src tests`。
+- 通过 `python -m unittest discover -s tests`，共 7 个测试。
+- 通过最小世界状态、市场 intro 场景和市场 NPC 场景 JSON 解析。
+
 ## 2026-07-20 - 阶段 2 内容仓库与场景编排
 
 ### 新增

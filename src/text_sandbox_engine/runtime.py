@@ -35,6 +35,7 @@ class Runtime:
             self.state_store,
             self.registry,
             scene_orchestrator=scene_orchestrator,
+            content_repository=self.content_repository,
         )
 
     @classmethod

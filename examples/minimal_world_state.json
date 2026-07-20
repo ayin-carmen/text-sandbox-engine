@@ -51,6 +51,23 @@
         }
       },
       "metadata": {}
+    },
+    "actor.mara": {
+      "id": "actor.mara",
+      "type": "actor",
+      "tags": ["npc", "vendor"],
+      "components": {
+        "profile": {
+          "name": "玛拉"
+        },
+        "location": {
+          "current": "location.market"
+        },
+        "relationship": {
+          "trust": 0
+        }
+      },
+      "metadata": {}
     }
   },
   "globals": {
@@ -61,13 +78,14 @@
     }
   },
   "flags": {
-    "met_market": false
+    "met_market": false,
+    "talked_to_mara": false
   },
   "history": [],
   "cooldowns": {},
   "indexes": {
     "entities_by_type": {
-      "actor": ["actor.player"],
+      "actor": ["actor.player", "actor.mara"],
       "location": ["location.town_square", "location.market"]
     }
   },

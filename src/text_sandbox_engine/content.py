@@ -45,6 +45,12 @@ class ContentRepository:
     def all_scenes(self) -> list[dict[str, Any]]:
         return [dict(scene) for scene in self._scenes]
 
+    def get_scene(self, scene_id: str) -> dict[str, Any] | None:
+        for scene in self._scenes:
+            if scene.get("id") == scene_id:
+                return dict(scene)
+        return None
+
     def validate(self, registry: Registry | None = None) -> ContentValidationReport:
         issues: list[ContentValidationIssue] = []
         seen_ids: set[str] = set()
@@ -94,6 +100,17 @@ def rule_refs_from_scene(scene: dict[str, Any]) -> list[RuleRef]:
             metadata=dict(item.get("metadata", {})),
         )
         for item in scene.get("conditions", [])
+    ]
+
+
+def rule_refs_from_choice(choice: dict[str, Any]) -> list[RuleRef]:
+    return [
+        RuleRef(
+            rule=item["rule"],
+            args=list(item.get("args", [])),
+            metadata=dict(item.get("metadata", {})),
+        )
+        for item in choice.get("visible_if", [])
     ]
 
 

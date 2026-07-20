@@ -65,6 +65,53 @@ class RuntimeTests(unittest.TestCase):
         self.assertEqual(report["selected"], "scene.market_intro")
         self.assertEqual(report["filtered"], [])
 
+    def test_playable_loop_applies_scene_choice_and_reveals_npc_scene(self) -> None:
+        runtime = Runtime.from_file(EXAMPLE_STATE, content_path=EXAMPLE_CONTENT)
+        travel = runtime.execute(
+            {
+                "type": "space.travel_to",
+                "actor": "actor.player",
+                "target": "location.market",
+                "args": {},
+            }
+        )
+
+        intro_choice = runtime.execute(
+            {
+                "type": "narrative.choose",
+                "actor": "actor.player",
+                "target": travel.trace.presentation.selected_scene,
+                "args": {"choice_index": 0},
+            }
+        )
+
+        self.assertEqual(intro_choice.status, "succeeded")
+        self.assertTrue(intro_choice.state["flags"]["met_market"])
+        self.assertEqual(intro_choice.state["globals"]["clock"]["tick"], 2)
+        self.assertEqual(intro_choice.trace.presentation.selected_scene, "scene.market_vendor")
+        vendor_rules = intro_choice.trace.presentation.scene_candidate_report["candidates"][0]["rules"]
+        self.assertTrue(any(rule["rule"] == "actor.is_present" for rule in vendor_rules))
+
+        vendor_choice = runtime.execute(
+            {
+                "type": "narrative.choose",
+                "actor": "actor.player",
+                "target": "scene.market_vendor",
+                "args": {"choice_index": 0},
+            }
+        )
+
+        self.assertEqual(vendor_choice.status, "succeeded")
+        self.assertTrue(vendor_choice.state["flags"]["talked_to_mara"])
+        self.assertEqual(vendor_choice.trace.effect_results[0].effect_type, "flag.set")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            save_path = Path(tmpdir) / "playable_loop_save.json"
+            runtime.save_game(save_path)
+            loaded = Runtime.load_game(save_path)
+
+        self.assertEqual(loaded.snapshot(), runtime.snapshot())
+
     def test_failed_rule_produces_no_state_changes(self) -> None:
         runtime = self.load_runtime()
         before = runtime.snapshot()

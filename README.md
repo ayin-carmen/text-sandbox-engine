@@ -31,7 +31,7 @@
 
 ## Python Prototype
 
-阶段 1 原型位于 `src/text_sandbox_engine/`。
+Python 原型位于 `src/text_sandbox_engine/`。
 
 当前已实现：
 
@@ -46,6 +46,9 @@
 9. 基础内置命令、规则和效果。
 10. `ContentRepository` 内容仓库。
 11. 基础场景加载、校验、筛选和候选报告。
+12. `time`、`space`、`narrative`、`actor` 最小玩法模块。
+13. `narrative.choose` 场景选项执行命令。
+14. NPC 在场判断与最小可玩循环。
 
 运行测试：
 
@@ -55,7 +58,7 @@ python -m unittest discover -s tests
 
 ## Current Status
 
-项目处于阶段 2：内容仓库与场景编排。
+项目处于阶段 3：最小玩法模块。
 
 已完成：
 
@@ -67,5 +70,7 @@ python -m unittest discover -s tests
 6. 最小 Python 运行时原型。
 7. 命令执行、规则判断、效果应用、事务提交和存档读写测试。
 8. JSON 场景内容加载、基础校验和场景候选报告。
+9. 最小玩法模块：时间、空间、叙事、角色。
+10. 最小可玩循环：移动到市场、触发场景、执行选项、显示 NPC 场景。
 
-下一步是进入阶段 3：最小玩法模块。
+下一步是进入阶段 4：持久化与迁移体系。

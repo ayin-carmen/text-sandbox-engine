@@ -1,0 +1,36 @@
+{
+  "id": "scene.market_vendor",
+  "scope": {
+    "location": "location.market"
+  },
+  "priority": 5,
+  "conditions": [
+    {
+      "rule": "time.period_in",
+      "args": ["morning", "afternoon"]
+    },
+    {
+      "rule": "actor.is_present",
+      "args": ["actor.mara"]
+    },
+    {
+      "rule": "flag.is_false",
+      "args": ["talked_to_mara"]
+    }
+  ],
+  "content_tags": ["npc", "market"],
+  "text": "摊主玛拉抬头看了你一眼，指尖还压着半卷粗布。",
+  "choices": [
+    {
+      "text": "向玛拉问好",
+      "effects": [
+        {
+          "effect": "flag.set",
+          "args": ["talked_to_mara", true]
+        }
+      ]
+    }
+  ],
+  "cooldown": {},
+  "repeat_policy": "once"
+}

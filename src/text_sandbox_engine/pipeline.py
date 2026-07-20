@@ -18,17 +18,23 @@ class CommandPipeline:
         state_store: StateStore,
         registry: Registry,
         scene_orchestrator: SceneOrchestrator | None = None,
+        content_repository: object | None = None,
     ) -> None:
         self._state_store = state_store
         self._registry = registry
         self._rule_engine = RuleEngine(registry)
         self._effect_engine = EffectEngine(registry)
         self._scene_orchestrator = scene_orchestrator or SceneOrchestrator()
+        self._content_repository = content_repository
 
     def execute(self, command: Command | dict[str, Any]) -> CommandResult:
         normalized = command if isinstance(command, Command) else Command.from_mapping(command)
         command_id = normalized.id or self._next_command_id()
-        context = {"command_id": command_id, "command": normalized}
+        context = {
+            "command_id": command_id,
+            "command": normalized,
+            "content_repository": self._content_repository,
+        }
 
         try:
             handler = self._registry.get_command(normalized.type)
