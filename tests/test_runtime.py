@@ -163,7 +163,10 @@ class RuntimeTests(unittest.TestCase):
         self.assertIn("world_state", raw_save)
         self.assertEqual(report.metadata.save_schema_version, 2)
         self.assertEqual(loaded.metadata.engine_version, "0.4.0")
-        self.assertEqual(loaded.metadata.enabled_modules, ["actor", "narrative", "space", "time"])
+        self.assertEqual(
+            loaded.metadata.enabled_modules,
+            ["actor", "inventory", "narrative", "quest", "social", "space", "time"],
+        )
         self.assertEqual(loaded.metadata.module_versions["space"], "0.1.0")
         self.assertEqual(loaded.metadata.component_schema_versions["location"], 1)
         self.assertEqual(loaded.metadata.random_state["seed"], 17020)

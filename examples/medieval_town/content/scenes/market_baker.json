@@ -23,6 +23,18 @@
         {
           "effect": "flag.set",
           "args": ["accepted_bread_delivery", true]
+        },
+        {
+          "effect": "inventory.add_item",
+          "args": ["actor.player", "item.bread_basket"]
+        },
+        {
+          "effect": "quest.set_stage",
+          "args": ["quest.bread_delivery", "accepted"]
+        },
+        {
+          "effect": "social.adjust_trust",
+          "args": ["actor.elda", 1]
         }
       ]
     }

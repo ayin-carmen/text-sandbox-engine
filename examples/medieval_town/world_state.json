@@ -116,7 +116,8 @@
           "connections": ["location.market_square"]
         },
         "access": {
-          "blocked": true
+          "blocked": false,
+          "required_flag": "has_keep_pass"
         }
       },
       "metadata": {}
@@ -127,13 +128,23 @@
       "day": 1,
       "period": "morning",
       "tick": 0
+    },
+    "narrative": {
+      "seen_scenes": []
+    },
+    "quests": {
+      "quest.bread_delivery": {
+        "stage": "not_started",
+        "completed": false
+      }
     }
   },
   "flags": {
     "met_guard": false,
     "heard_market_notice": false,
     "accepted_bread_delivery": false,
-    "visited_chapel": false
+    "visited_chapel": false,
+    "has_keep_pass": false
   },
   "history": [],
   "cooldowns": {},

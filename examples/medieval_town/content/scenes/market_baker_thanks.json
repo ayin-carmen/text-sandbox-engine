@@ -1,0 +1,32 @@
+{
+  "id": "scene.greybrook.market_baker_thanks",
+  "scope": {
+    "location": "location.market_square"
+  },
+  "priority": 8,
+  "conditions": [
+    {
+      "rule": "social.trust_at_least",
+      "args": ["actor.elda", 3]
+    },
+    {
+      "rule": "quest.stage_is",
+      "args": ["quest.bread_delivery", "completed"]
+    }
+  ],
+  "content_tags": ["npc", "market", "relationship", "quest"],
+  "text": "艾尔达远远向你点头，把一小块温热面包塞进你的手里当作谢礼。",
+  "choices": [
+    {
+      "text": "收下谢礼",
+      "effects": [
+        {
+          "effect": "inventory.add_item",
+          "args": ["actor.player", "item.warm_bread"]
+        }
+      ]
+    }
+  ],
+  "cooldown": {},
+  "repeat_policy": "once"
+}

@@ -5,21 +5,21 @@
 ## 高优先级
 
 1. `inventory`
-   当前送面包只能用旗标表达，缺少物品、容器、转移和持有规则。
+   阶段 7 已用 `inventory.add_item`、`inventory.remove_item` 和 `inventory.has_item` 覆盖基础物品持有与转移。
 
 2. `social`
-   面包师请求与守卫互动都需要关系变化，但当前只能用布尔旗标近似表达。
+   阶段 7 已用 `social.adjust_trust` 和 `social.trust_at_least` 覆盖基础信任变化与判断。
 
 3. `access`
-   领主塔楼可以静态 blocked，但缺少基于许可、时间、身份或任务状态的动态准入。
+   阶段 7 已在 `space.location_accessible` 中支持 `required_flag` 动态准入。
 
 4. `history`
-   `repeat_policy` 和 `cooldown` 字段存在，但没有正式记录场景已见、冷却或重复策略。
+   阶段 7 已用 `narrative.mark_scene_seen` 和 `repeat_policy: once` 覆盖一次性场景历史。
 
 ## 中优先级
 
 1. `quest`
-   送面包已经表现出任务阶段需求，但目前只能用多个旗标串联。
+   阶段 7 已用 `quest.set_stage`、`quest.complete` 和 `quest.stage_is` 覆盖基础任务阶段。
 
 2. `schedule`
    NPC 位置当前是静态状态，后续需要按时间段移动。

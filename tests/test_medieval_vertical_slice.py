@@ -22,20 +22,36 @@ class MedievalVerticalSliceTests(unittest.TestCase):
         report = validate_content(MEDIEVAL_CONTENT)
 
         self.assertTrue(report["passed"])
-        self.assertEqual(report["scene_count"], 4)
+        self.assertEqual(report["scene_count"], 5)
 
     def test_medieval_vertical_slice_replays_successfully(self) -> None:
         report = replay_commands(MEDIEVAL_STATE, MEDIEVAL_COMMANDS, content_path=MEDIEVAL_CONTENT)
 
         self.assertEqual(report["status"], "succeeded")
-        self.assertEqual(report["command_count"], 6)
+        self.assertEqual(report["command_count"], 8)
         self.assertTrue(report["final_state"]["flags"]["met_guard"])
         self.assertTrue(report["final_state"]["flags"]["heard_market_notice"])
         self.assertTrue(report["final_state"]["flags"]["accepted_bread_delivery"])
         self.assertTrue(report["final_state"]["flags"]["visited_chapel"])
         self.assertEqual(
             report["final_state"]["entities"]["actor.player"]["components"]["location"]["current"],
-            "location.chapel_yard",
+            "location.market_square",
+        )
+        self.assertEqual(
+            report["final_state"]["globals"]["quests"]["quest.bread_delivery"]["stage"],
+            "completed",
+        )
+        self.assertEqual(
+            report["final_state"]["entities"]["actor.elda"]["components"]["relationship"]["trust"],
+            3,
+        )
+        self.assertNotIn(
+            "item.bread_basket",
+            report["final_state"]["entities"]["actor.player"]["components"]["inventory"]["items"],
+        )
+        self.assertIn(
+            "item.warm_bread",
+            report["final_state"]["entities"]["actor.player"]["components"]["inventory"]["items"],
         )
 
     def test_restricted_keep_rejects_travel_without_state_change(self) -> None:
@@ -60,7 +76,7 @@ class MedievalVerticalSliceTests(unittest.TestCase):
         )
 
         self.assertEqual(result.status, "failed")
-        self.assertEqual(result.trace.failure_reason, "target is blocked")
+        self.assertEqual(result.trace.failure_reason, "required access flag is missing")
         self.assertEqual(runtime.snapshot(), before)
 
     def test_phase_6_report_documents_required_deliverables(self) -> None:

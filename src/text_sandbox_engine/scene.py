@@ -36,6 +36,17 @@ class SceneOrchestrator:
                 )
                 continue
 
+            repeat_result = _repeat_policy_allows(scene, state)
+            if not repeat_result["matched"]:
+                filtered.append(
+                    {
+                        "scene": scene_id,
+                        "eligible": False,
+                        "reason": repeat_result["reason"],
+                    }
+                )
+                continue
+
             rule_results = []
             if self._rule_engine:
                 rule_results = [
@@ -107,6 +118,15 @@ def _scope_matches(scene: dict[str, Any], state: dict[str, Any], context: dict[s
         }
 
     return {"matched": True, "reason": "scope matched"}
+
+
+def _repeat_policy_allows(scene: dict[str, Any], state: dict[str, Any]) -> dict[str, Any]:
+    if scene.get("repeat_policy") != "once":
+        return {"matched": True, "reason": "repeat policy allows scene"}
+    seen_scenes = state.get("globals", {}).get("narrative", {}).get("seen_scenes", [])
+    if scene["id"] in seen_scenes:
+        return {"matched": False, "reason": "scene has already been seen"}
+    return {"matched": True, "reason": "scene has not been seen"}
 
 
 def _rule_report(result: Any) -> dict[str, Any]:

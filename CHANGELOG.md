@@ -2,6 +2,31 @@
 
 本文件按每次更新独立记录，不把后续提交合并进已有条目。
 
+## 2026-07-21 - 阶段 7 正式玩法模块扩展
+
+### 新增
+
+- 新增 `inventory` 模块，提供 `inventory.has_item`、`inventory.add_item`、`inventory.remove_item`。
+- 新增 `social` 模块，提供 `social.trust_at_least`、`social.adjust_trust`。
+- 新增 `quest` 模块，提供 `quest.stage_is`、`quest.set_stage`、`quest.complete`。
+- 新增 `narrative.mark_scene_seen` 与 `narrative.scene_not_seen`，使 `repeat_policy: once` 真正落地到状态。
+- 新增 `docs/phase_7_formal_gameplay_modules_report.md` 阶段 7 模块扩展报告。
+- 新增阶段 7 测试，覆盖物品、信任、任务、一次性场景和动态准入。
+
+### 变更
+
+- 扩展 `space.location_accessible`，支持 `required_flag` 动态准入。
+- 增强事务写入，允许效果创建新状态路径并读取默认值。
+- 将中世纪小镇切片升级为正式模块表达：面包篮、送货任务、信任变化和任务完成后的感谢场景。
+- 更新阶段 6 模块缺口清单，标记已由阶段 7 覆盖的缺口。
+
+### 验证
+
+- 通过 `python -m compileall src tests`。
+- 通过 `python -m unittest discover -s tests`，共 30 个测试。
+- 通过 `examples/medieval_town/` 全部 JSON 文件解析。
+- 通过中世纪内容包 `content-validate` 和 `replay` CLI 验证。
+
 ## 2026-07-21 - 阶段 6 中世纪沙盒内容验证
 
 ### 新增

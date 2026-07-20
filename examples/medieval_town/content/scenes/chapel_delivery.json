@@ -6,6 +6,14 @@
   "priority": 10,
   "conditions": [
     {
+      "rule": "quest.stage_is",
+      "args": ["quest.bread_delivery", "accepted"]
+    },
+    {
+      "rule": "inventory.has_item",
+      "args": ["actor.player", "item.bread_basket"]
+    },
+    {
       "rule": "flag.is_false",
       "args": ["visited_chapel"]
     }
@@ -19,6 +27,18 @@
         {
           "effect": "flag.set",
           "args": ["visited_chapel", true]
+        },
+        {
+          "effect": "inventory.remove_item",
+          "args": ["actor.player", "item.bread_basket"]
+        },
+        {
+          "effect": "quest.complete",
+          "args": ["quest.bread_delivery"]
+        },
+        {
+          "effect": "social.adjust_trust",
+          "args": ["actor.elda", 2]
         }
       ]
     }

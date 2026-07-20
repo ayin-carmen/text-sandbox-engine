@@ -67,13 +67,24 @@ def rule_location_accessible(state: dict[str, Any], args: list[Any], context: di
     if target is None:
         return RuleResult(False, "space.location_accessible", args, "target not found")
 
-    blocked = bool(target.get("components", {}).get("access", {}).get("blocked", False))
+    access = target.get("components", {}).get("access", {})
+    blocked = bool(access.get("blocked", False))
+    required_flag = access.get("required_flag")
+    has_required_flag = True
+    if required_flag:
+        has_required_flag = bool(state.get("flags", {}).get(required_flag, False))
+    passed = not blocked and has_required_flag
+    reason = "target is accessible"
+    if blocked:
+        reason = "target is blocked"
+    elif not has_required_flag:
+        reason = "required access flag is missing"
     return RuleResult(
-        passed=not blocked,
+        passed=passed,
         rule_type="space.location_accessible",
         args=args,
-        reason="target is accessible" if not blocked else "target is blocked",
-        observed={"blocked": blocked},
+        reason=reason,
+        observed={"blocked": blocked, "required_flag": required_flag, "has_required_flag": has_required_flag},
     )
 
 

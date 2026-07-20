@@ -75,6 +75,11 @@
       "day": 1,
       "period": "morning",
       "tick": 0
+    },
+    "narrative": {
+      "seen_scenes": []
+    },
+    "quests": {
     }
   },
   "flags": {

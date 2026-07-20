@@ -42,5 +42,19 @@
     "args": {
       "choice_index": 0
     }
+  },
+  {
+    "type": "space.travel_to",
+    "actor": "actor.player",
+    "target": "location.market_square",
+    "args": {}
+  },
+  {
+    "type": "narrative.choose",
+    "actor": "actor.player",
+    "target": "scene.greybrook.market_baker_thanks",
+    "args": {
+      "choice_index": 0
+    }
   }
 ]

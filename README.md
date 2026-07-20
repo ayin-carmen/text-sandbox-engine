@@ -55,6 +55,7 @@ Python 原型位于 `src/text_sandbox_engine/`。
 15. 版本化存档 envelope、模块版本记录、组件 schema version 和迁移报告。
 16. 开发期诊断 CLI：内容校验、命令回放、场景候选报告和状态差异对比。
 17. 中世纪小镇垂直切片内容包与验证报告。
+18. 正式玩法模块扩展：`inventory`、`social`、`quest`、动态准入和一次性场景历史。
 
 运行测试：
 
@@ -76,7 +77,7 @@ PYTHONPATH=src python -m text_sandbox_engine.cli changed-by --trace trace.json -
 
 ## Current Status
 
-项目处于阶段 6：中世纪沙盒内容验证。
+项目处于阶段 7：正式玩法模块扩展。
 
 已完成：
 
@@ -93,5 +94,6 @@ PYTHONPATH=src python -m text_sandbox_engine.cli changed-by --trace trace.json -
 11. 版本化存档结构、模块版本校验、组件版本记录和旧格式迁移。
 12. 开发期诊断工具：内容校验、命令回放、场景候选分析和状态差异报告。
 13. 中世纪小镇垂直切片内容包、玩法反馈报告、模块缺口清单和数据格式修订建议。
+14. 正式玩法模块：物品、社交信任、任务阶段、动态准入和场景已见历史。
 
-下一步是进入阶段 7：正式玩法模块扩展。
+阶段 8：工具链与生产化暂时不进入。
