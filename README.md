@@ -6,6 +6,9 @@
 
 ## Documents
 
+- `docs/usage_guide.md`
+  使用说明，包含环境准备、测试、CLI、Python API、内容包结构、内置规则效果和扩展流程。
+
 - `docs/professional_text_sandbox_engine_architecture.txt`  
   专业化文字沙盒引擎架构方案，包含核心原则、运行时架构、数据模型、模块系统、内容系统、存档迁移、诊断测试与未来计划。
 
