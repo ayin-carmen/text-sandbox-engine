@@ -58,8 +58,7 @@ jobs:
           targets: x86_64-pc-windows-msvc
 
       - name: Build Tauri installer
-        working-directory: editor
-        run: npx tauri build --config ../src-tauri/tauri.conf.json
+        run: npx --prefix editor tauri build --config src-tauri/tauri.conf.json
 
       - name: Upload Windows installer
         uses: actions/upload-artifact@v4

@@ -2,6 +2,16 @@
 
 本文件按每次更新独立记录，不把后续提交合并进已有条目。
 
+## 2026-07-22 - 修复 Windows Tauri 构建工作流
+
+### 修复
+
+- 修正 GitHub Actions 中 Tauri 的启动目录，使 CLI 从仓库根目录读取 `src-tauri/tauri.conf.json`，避免在 `editor/` 子目录中找不到 Tauri 项目。
+
+### 验证
+
+- GitHub Actions 已确认 Python、PyInstaller、Node 和 Rust 环境步骤通过；修复后重新执行 Windows NSIS 构建。
+
 ## 2026-07-22 - 完成阶段 8 编辑器可视化与桌面工具链
 
 ### 新增
