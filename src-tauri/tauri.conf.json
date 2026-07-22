@@ -1,0 +1,21 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Text Sandbox Editor",
+  "version": "0.1.0",
+  "identifier": "local.textsandbox.editor",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build",
+    "devUrl": "http://localhost:5173",
+    "frontendDist": "../editor/dist"
+  },
+  "app": {
+    "windows": [{ "title": "Text Sandbox Editor", "width": 1440, "height": 960, "minWidth": 960, "minHeight": 640 }],
+    "security": { "csp": "default-src 'self' http://127.0.0.1:8765 http://localhost:5173; connect-src 'self' http://127.0.0.1:8765 ws://localhost:5173; style-src 'self' 'unsafe-inline'; worker-src 'self' blob:; font-src 'self' data:;" }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "windows": { "nsis": { "installMode": "currentUser" } }
+  }
+}

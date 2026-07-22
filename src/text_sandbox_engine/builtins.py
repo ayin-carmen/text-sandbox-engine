@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from .models import EffectResult, RuleResult
+from .metadata import register_builtin_metadata
 from .modules import register_default_modules
 from .registry import Registry
 from .transaction import Transaction
@@ -14,6 +15,7 @@ def register_builtins(registry: Registry) -> None:
     register_default_modules(registry)
     registry.register_rule("flag.is_false", rule_flag_is_false)
     registry.register_effect("flag.set", effect_set_flag)
+    register_builtin_metadata(registry)
 
 
 def rule_flag_is_false(state: dict[str, Any], args: list[Any], context: Any) -> RuleResult:

@@ -1,12 +1,12 @@
 # 使用说明
 
-这份说明面向想把当前原型跑起来、调试内容包、或继续扩展玩法模块的人。当前项目处于阶段 7，已经具备命令驱动运行时、内容场景加载、诊断 CLI、存档迁移、中世纪小镇示例，以及 `inventory`、`social`、`quest` 等正式玩法模块。
+这份说明面向想把当前原型跑起来、调试内容包、或继续扩展玩法模块的人。当前项目处于阶段 8，除了命令驱动运行时、内容场景加载、诊断 CLI、存档迁移和正式玩法模块，还提供本地编辑器 API、React 编辑器和 Tauri 桌面壳工程。
 
 ## 环境要求
 
 - Python 3.11 或更高版本。
 - Windows PowerShell、Git Bash、Linux shell 均可运行。
-- 本地开发时不需要额外第三方依赖。
+- 引擎和测试本身不需要额外第三方依赖；编辑器开发需要 Node.js、npm，以及 Python 的 `fastapi` 和 `uvicorn`。
 
 如果没有安装为包，建议在仓库根目录运行命令，并让 Python 能找到 `src`：
 
@@ -39,7 +39,44 @@ python -m unittest discover -s tests
 python -m compileall src tests
 ```
 
-当前应通过 30 个单元测试。
+当前应通过 34 个单元测试。
+
+## 启动阶段 8 编辑器
+
+编辑器由两个本地进程组成：Python API 负责调用真实引擎，React 前端负责可视化和编辑。API 只监听 `127.0.0.1`，不会默认暴露公网。
+
+PowerShell：
+
+```powershell
+$env:PYTHONPATH = "src"
+python -m pip install -e ".[editor]"
+python -m text_sandbox_editor_api
+```
+
+另开一个终端启动前端：
+
+```powershell
+cd editor
+npm install
+npm run dev
+```
+
+浏览器打开 `http://localhost:5173`，在顶部输入 `examples/medieval_town` 并打开。编辑器支持内容树、结构化场景表单、JSON 源码、关系图、隔离命令回放、world state 和诊断面板。保存前会重新校验 JSON 和引擎注册表，保存时生成同目录 `.bak` 备份，并用临时文件原子替换目标文件。
+
+运行预览创建内存中的 `Runtime` 副本。预览、trace、场景候选分析和 state diff 不会写入源 `world_state.json`。
+
+## 构建桌面版本
+
+仓库中的 `src-tauri/` 是 Tauri 2 最小桌面壳。目标机器需要 Rust、Node.js 和 Python 运行环境；安装 Rust 后在仓库根目录执行：
+
+```powershell
+cd editor
+npm install
+cd ..
+npx tauri build --config src-tauri/tauri.conf.json
+```
+
+生产壳启动时会在本机启动 `text_sandbox_editor_api`，退出时结束该进程。构建产物位于 Tauri 的 `src-tauri/target/release/bundle/` 目录。
 
 ## 运行中世纪小镇示例
 

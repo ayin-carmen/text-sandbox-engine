@@ -6,6 +6,13 @@ requires-python = ">=3.11"
 
 [project.scripts]
 text-sandbox-engine = "text_sandbox_engine.cli:main"
+text-sandbox-editor-api = "text_sandbox_editor_api.__main__:main"
+
+[project.optional-dependencies]
+editor = [
+    "fastapi>=0.115",
+    "uvicorn>=0.30",
+]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

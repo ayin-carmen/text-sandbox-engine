@@ -8,6 +8,8 @@
 
 - `docs/usage_guide.md`
   使用说明，包含环境准备、测试、CLI、Python API、内容包结构、内置规则效果和扩展流程。
+- `docs/phase_8_editor_usage.md`
+  阶段 8 编辑器、FastAPI、本地运行会话和 Tauri 打包使用说明。
 
 - `docs/professional_text_sandbox_engine_architecture.txt`  
   专业化文字沙盒引擎架构方案，包含核心原则、运行时架构、数据模型、模块系统、内容系统、存档迁移、诊断测试与未来计划。
@@ -59,6 +61,8 @@ Python 原型位于 `src/text_sandbox_engine/`。
 16. 开发期诊断 CLI：内容校验、命令回放、场景候选报告和状态差异对比。
 17. 中世纪小镇垂直切片内容包与验证报告。
 18. 正式玩法模块扩展：`inventory`、`social`、`quest`、动态准入和一次性场景历史。
+19. 阶段 8 本地编辑器 API：工作区、场景读写、稳定诊断、内容索引、关系图、隔离运行会话和安全保存。
+20. 阶段 8 React + TypeScript + Vite 编辑器，以及 Tauri 2 桌面壳最小工程。
 
 运行测试：
 
@@ -80,7 +84,7 @@ PYTHONPATH=src python -m text_sandbox_engine.cli changed-by --trace trace.json -
 
 ## Current Status
 
-项目处于阶段 7：正式玩法模块扩展。
+项目处于阶段 8：编辑器可视化与桌面工具链扩展。
 
 已完成：
 
@@ -98,5 +102,5 @@ PYTHONPATH=src python -m text_sandbox_engine.cli changed-by --trace trace.json -
 12. 开发期诊断工具：内容校验、命令回放、场景候选分析和状态差异报告。
 13. 中世纪小镇垂直切片内容包、玩法反馈报告、模块缺口清单和数据格式修订建议。
 14. 正式玩法模块：物品、社交信任、任务阶段、动态准入和场景已见历史。
-
-阶段 8：工具链与生产化暂时不进入。
+15. 阶段 8 编辑器适配层和本地 API。
+16. 阶段 8 React 编辑器和 Tauri 桌面配置。

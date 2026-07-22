@@ -1,0 +1,182 @@
+"""FastAPI application for the local editor process."""
+
+from __future__ import annotations
+
+from typing import Any
+
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
+
+from .service import EditorService, RevisionConflict
+
+
+class WorkspaceOpen(BaseModel):
+    root: str
+
+
+class SceneDocument(BaseModel):
+    document: dict[str, Any]
+    revision: str | None = None
+
+
+class SceneName(BaseModel):
+    new_scene_id: str
+    revision: str
+
+
+class SessionCommand(BaseModel):
+    command: dict[str, Any]
+
+
+class CandidateRequest(BaseModel):
+    session_id: str | None = None
+    actor: str = "actor.player"
+
+
+class StateDiffRequest(BaseModel):
+    before: dict[str, Any]
+    after: dict[str, Any]
+
+
+class ChangedByRequest(BaseModel):
+    trace: dict[str, Any]
+    path: str
+
+
+def create_app(service: EditorService | None = None) -> FastAPI:
+    editor = service or EditorService()
+    app = FastAPI(title="Text Sandbox Editor API", version="0.1.0")
+    app.state.editor_service = editor
+    app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:5173", "tauri://localhost"], allow_methods=["*"], allow_headers=["*"])
+
+    @app.exception_handler(RevisionConflict)
+    async def revision_conflict_handler(_, exc: RevisionConflict):
+        return _error(409, "editor.external_conflict", str(exc))
+
+    @app.post("/api/workspaces/open")
+    def open_workspace(payload: WorkspaceOpen):
+        return editor.open_workspace(payload.root)
+
+    @app.get("/api/workspaces/current")
+    def current_workspace():
+        return editor.current_workspace()
+
+    @app.get("/api/workspaces/tree")
+    def workspace_tree():
+        return editor.tree()
+
+    @app.post("/api/workspaces/refresh")
+    def refresh_workspace():
+        return editor.refresh()
+
+    @app.get("/api/content/scenes")
+    def list_scenes():
+        return {"scenes": editor.scenes()}
+
+    @app.get("/api/content/scenes/{scene_id:path}")
+    def get_scene(scene_id: str):
+        return editor.scene(scene_id)
+
+    @app.post("/api/content/scenes")
+    def create_scene(payload: SceneDocument):
+        try:
+            return editor.create_scene(payload.document)
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from exc
+
+    @app.put("/api/content/scenes/{scene_id:path}")
+    def save_scene(scene_id: str, payload: SceneDocument):
+        if not payload.revision:
+            raise HTTPException(422, "revision is required")
+        try:
+            return editor.save_scene(scene_id, payload.document, payload.revision)
+        except KeyError as exc:
+            raise HTTPException(404, str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from exc
+
+    @app.delete("/api/content/scenes/{scene_id:path}")
+    def delete_scene(scene_id: str, revision: str):
+        try:
+            return editor.delete_scene(scene_id, revision)
+        except KeyError as exc:
+            raise HTTPException(404, str(exc)) from exc
+        except RevisionConflict as exc:
+            raise HTTPException(409, str(exc)) from exc
+
+    @app.post("/api/content/scenes/{scene_id:path}/duplicate")
+    def duplicate_scene(scene_id: str, payload: SceneName):
+        try:
+            return editor.duplicate_scene(scene_id, payload.new_scene_id, payload.revision)
+        except (KeyError, ValueError) as exc:
+            raise HTTPException(422, str(exc)) from exc
+
+    @app.post("/api/content/scenes/{scene_id:path}/rename")
+    def rename_scene(scene_id: str, payload: SceneName):
+        try:
+            return editor.rename_scene(scene_id, payload.new_scene_id, payload.revision)
+        except KeyError as exc:
+            raise HTTPException(404, str(exc)) from exc
+        except RevisionConflict as exc:
+            raise HTTPException(409, str(exc)) from exc
+
+    @app.get("/api/metadata/registry")
+    def registry_metadata():
+        return editor.registry_metadata()
+
+    @app.get("/api/metadata/schemas")
+    def schemas():
+        return editor.schemas()
+
+    @app.post("/api/validation/content")
+    def validate_content():
+        return editor.validate_content()
+
+    @app.post("/api/validation/document")
+    def validate_document(payload: SceneDocument):
+        return editor.validate_document(payload.document, None)
+
+    @app.get("/api/graph/content")
+    def graph_content():
+        return editor.graph()
+
+    @app.post("/api/runtime/sessions")
+    def create_session():
+        return editor.create_session()
+
+    @app.post("/api/runtime/sessions/{session_id}/commands")
+    def execute_command(session_id: str, payload: SessionCommand):
+        try:
+            return editor.session_command(session_id, payload.command)
+        except KeyError as exc:
+            raise HTTPException(404, str(exc)) from exc
+
+    @app.get("/api/runtime/sessions/{session_id}/state")
+    def session_state(session_id: str):
+        try:
+            return editor.session_state(session_id)
+        except KeyError as exc:
+            raise HTTPException(404, str(exc)) from exc
+
+    @app.post("/api/diagnostics/scene-candidates")
+    def scene_candidates(payload: CandidateRequest):
+        return editor.candidate_report(payload.session_id, payload.actor)
+
+    @app.post("/api/diagnostics/state-diff")
+    def state_diff(payload: StateDiffRequest):
+        return editor.state_diff(payload.before, payload.after)
+
+    @app.post("/api/diagnostics/changed-by")
+    def changed_by(payload: ChangedByRequest):
+        return {"matches": editor.changed_by(payload.trace, payload.path)}
+
+    return app
+
+
+def _error(status: int, code: str, message: str):
+    from fastapi.responses import JSONResponse
+    return JSONResponse(status_code=status, content={"error": {"code": code, "message": message}})
+
+
+app = create_app()

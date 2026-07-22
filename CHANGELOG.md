@@ -2,6 +2,34 @@
 
 本文件按每次更新独立记录，不把后续提交合并进已有条目。
 
+## 2026-07-22 - 完成阶段 8 编辑器可视化与桌面工具链
+
+### 新增
+
+- 新增 `src/text_sandbox_editor_api/` 本地 FastAPI 适配层，提供工作区、场景内容、元数据、校验、关系图、运行会话和诊断接口。
+- 新增 Registry 编辑器元数据，描述命令、规则和效果的参数、读取路径、写入路径和模块版本。
+- 新增稳定诊断字段：严重级别、错误码、消息、文件路径、JSON path 和场景 ID。
+- 新增内容索引和关系图数据，支持从真实场景追踪地点、角色、规则、效果、任务、物品和状态引用。
+- 新增内存运行会话，支持真实引擎命令执行、trace、场景候选分析和 state diff，预览不会修改源 world state。
+- 新增原子 JSON 保存、同目录备份、修订标识和外部修改冲突检测。
+- 新增 `editor/` React + TypeScript + Vite 编辑器，包含内容树、结构化场景表单、Monaco JSON 源码视图、Cytoscape 关系图、运行预览和问题面板。
+- 新增 `src-tauri/` Tauri 2 最小桌面壳配置，负责窗口和本地 Python API 进程生命周期。
+- 新增 `docs/phase_8_editor_usage.md` 阶段 8 编辑器和桌面构建使用说明。
+
+### 变更
+
+- 扩展 `Registry`，在保持原有执行 API 不变的情况下增加编辑器元数据出口。
+- 更新 README 和使用说明，将项目状态推进到阶段 8。
+- 更新 `.gitignore`，忽略前端依赖、构建产物、Tauri target 和编辑器备份文件。
+
+### 验证
+
+- 通过 `python -m compileall -q src tests`。
+- 通过 `python -m unittest discover -s tests`，共 34 个测试。
+- 通过 FastAPI TestClient 打开 `examples/medieval_town`，读取 5 个真实场景、生成 45 条关系边、启动隔离会话并成功执行移动命令。
+- 通过 `npm run build`，TypeScript 检查和 Vite 生产构建成功。
+- 当前环境未安装 Rust/Cargo，因此 Tauri 安装包尚未在本机实际编译；Tauri 配置和启动/退出逻辑已加入仓库。
+
 ## 2026-07-21 - 新增使用说明
 
 ### 新增
