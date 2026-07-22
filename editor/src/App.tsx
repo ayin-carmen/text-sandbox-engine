@@ -136,14 +136,16 @@ function App() {
     try {
       const command = JSON.parse(commandText) as Record<string, unknown>;
       let activeSessionId = sessionId;
+      let beforeState = state;
       if (!activeSessionId) {
         const created = await api.createSession();
         activeSessionId = created.session_id;
+        beforeState = created.state;
         setSessionId(activeSessionId);
         setState(created.state);
       }
       const result = await api.command(activeSessionId, command);
-      setStateDiff(await api.stateDiff(state ?? {}, result.state));
+      setStateDiff(await api.stateDiff(beforeState ?? {}, result.state));
       setState(result.state);
       setTrace(result.trace);
       setCandidates(await api.candidates(activeSessionId));
