@@ -3,7 +3,8 @@ import Editor from "@monaco-editor/react";
 import CytoscapeComponent from "react-cytoscapejs";
 import cytoscape from "cytoscape";
 import { ArrowDown, ArrowUp, Braces, CheckCircle2, CircleAlert, Copy, FileJson, FolderOpen, GitBranch, Play, RotateCcw, Save, Sparkles, Trash2 } from "lucide-react";
-import { api, Diagnostic, GraphData, ReferenceItem, RegistryItem, RuntimeAction, RuntimeActions, RuntimeSummary, SceneRecord, SceneTemplate } from "./api";
+import { api, Diagnostic, GraphData, ReferenceItem, RegistryItem, RuntimeActions, RuntimeSummary, SceneRecord, SceneTemplate } from "./api";
+import { ReferenceSelect } from "./LowCodeWidgets";
 
 type Tab = "form" | "json" | "graph" | "runtime" | "state";
 
@@ -478,10 +479,9 @@ function ArgumentFields({ item, args, references, onChange }: { item?: RegistryI
     const setValue = (next: unknown) => { const nextArgs = [...args]; nextArgs[index] = next; onChange(nextArgs); };
     const options = parameter.reference_type ? references.filter((reference) => reference.type === parameter.reference_type) : [];
     const current = String(value ?? "");
-    const hasCurrent = current !== "" && options.some((option) => option.id === current);
     return <label className="parameter-field" key={parameter.name}>
       <span>{parameter.label}{parameter.required ? " *" : ""}</span>
-      {parameter.widget === "reference_select" ? <select value={current} onChange={(event) => setValue(event.target.value)}>{current && !hasCurrent && <option value={current}>{current}（缺失引用）</option>}{options.map((option) => <option key={option.id} value={option.id}>{option.label} · {option.id}{option.valid ? "" : "（缺失引用）"}</option>)}</select>
+      {parameter.widget === "reference_select" ? <ReferenceSelect value={current} options={options} onChange={setValue} />
         : parameter.widget === "boolean" ? <input type="checkbox" checked={Boolean(value)} onChange={(event) => setValue(event.target.checked)} />
           : parameter.widget === "integer" || parameter.widget === "number" ? <input type="number" step={parameter.widget === "integer" ? 1 : "any"} value={value as number} onChange={(event) => setValue(event.target.value === "" ? "" : Number(event.target.value))} />
             : <input value={String(value)} onChange={(event) => setValue(event.target.value)} />}

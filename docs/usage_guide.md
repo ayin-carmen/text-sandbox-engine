@@ -1,6 +1,6 @@
 # 使用说明
 
-这份说明面向想把当前原型跑起来、调试内容包、或继续扩展玩法模块的人。当前项目处于阶段 8，除了命令驱动运行时、内容场景加载、诊断 CLI、存档迁移和正式玩法模块，还提供本地编辑器 API、React 编辑器和 Tauri 桌面壳工程。
+这份说明面向想把当前原型跑起来、调试内容包、或继续扩展玩法模块的人。当前项目已进入阶段 9，在命令驱动运行时、内容场景加载、诊断 CLI、存档迁移和正式玩法模块之外，还提供低代码场景向导、结构化参数编辑、引用选择器、即时诊断、按钮试玩和 Tauri 桌面壳工程。
 
 ## 环境要求
 
@@ -39,9 +39,9 @@ python -m unittest discover -s tests
 python -m compileall src tests
 ```
 
-当前应通过 34 个单元测试。
+当前应通过 41 个 Python 测试；前端组件测试使用 `npm test` 执行。
 
-## 启动阶段 8 编辑器
+## 启动阶段 9 低代码编辑器
 
 编辑器由两个本地进程组成：Python API 负责调用真实引擎，React 前端负责可视化和编辑。API 只监听 `127.0.0.1`，不会默认暴露公网。
 
@@ -61,9 +61,9 @@ npm install
 npm run dev
 ```
 
-浏览器打开 `http://localhost:5173`，在顶部输入 `examples/medieval_town` 并打开。编辑器支持内容树、结构化场景表单、JSON 源码、关系图、隔离命令回放、world state 和诊断面板。保存前会重新校验 JSON 和引擎注册表，保存时生成同目录 `.bak` 备份，并用临时文件原子替换目标文件。
+浏览器打开 `http://localhost:5173`，在顶部输入 `examples/medieval_town` 并打开。编辑器支持场景向导、模板预览、Registry 参数控件、引用选择器、内容树、结构化场景表单、JSON 源码、关系图、按钮试玩、world state 和诊断面板。保存前会重新校验 JSON 和引擎注册表，保存时生成同目录 `.bak` 备份，并用临时文件原子替换目标文件。
 
-运行预览创建内存中的 `Runtime` 副本。预览、trace、场景候选分析和 state diff 不会写入源 `world_state.json`。
+运行预览创建内存中的 `Runtime` 副本。点击“启动试玩”后，地点和场景选项按钮由真实引擎操作列表生成；预览、trace、场景候选分析和 state diff 不会写入源 `world_state.json`。完整低代码操作见 `docs/phase_9_low_code_editor_usage.md`。
 
 ## 构建桌面版本
 

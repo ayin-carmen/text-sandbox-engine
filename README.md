@@ -10,6 +10,10 @@
   使用说明，包含环境准备、测试、CLI、Python API、内容包结构、内置规则效果和扩展流程。
 - `docs/phase_8_editor_usage.md`
   阶段 8 编辑器、FastAPI、本地运行会话和 Tauri 打包使用说明。
+- `docs/phase_9_low_code_editor_usage.md`
+  阶段 9 低代码场景向导、结构化参数编辑、诊断和按钮试玩使用说明。
+- `docs/phase_9_completion_report.md`
+  阶段 9 交付范围、接口、验证结果和兼容性报告。
 
 - `docs/professional_text_sandbox_engine_architecture.txt`  
   专业化文字沙盒引擎架构方案，包含核心原则、运行时架构、数据模型、模块系统、内容系统、存档迁移、诊断测试与未来计划。
@@ -63,6 +67,7 @@ Python 原型位于 `src/text_sandbox_engine/`。
 18. 正式玩法模块扩展：`inventory`、`social`、`quest`、动态准入和一次性场景历史。
 19. 阶段 8 本地编辑器 API：工作区、场景读写、稳定诊断、内容索引、关系图、隔离运行会话和安全保存。
 20. 阶段 8 React + TypeScript + Vite 编辑器，以及 Tauri 2 桌面壳最小工程。
+21. 阶段 9 低代码场景向导、Registry 参数表单、引用选择器、即时诊断和按钮试玩控制台。
 
 运行测试：
 
@@ -84,7 +89,7 @@ PYTHONPATH=src python -m text_sandbox_engine.cli changed-by --trace trace.json -
 
 ## Current Status
 
-项目处于阶段 8：编辑器可视化与桌面工具链扩展。
+项目已完成阶段 9：低代码内容制作与可视化试玩。
 
 已完成：
 
@@ -105,3 +110,4 @@ PYTHONPATH=src python -m text_sandbox_engine.cli changed-by --trace trace.json -
 15. 阶段 8 编辑器适配层和本地 API。
 16. 阶段 8 React 编辑器和 Tauri 桌面配置。
 17. 阶段 8 API 单文件打包脚本和 GitHub Actions Windows 安装包构建流程。
+18. 阶段 9 低代码内容制作闭环与真实内容包端到端验证。
