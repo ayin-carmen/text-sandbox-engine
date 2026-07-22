@@ -272,6 +272,73 @@ class EditorService:
             for effect_index, effect in enumerate(choice.get("effects", []) if isinstance(choice, dict) else []):
                 if isinstance(effect, dict) and effect.get("effect") not in _effect_ids(registry):
                     issues.append(_issue("registry.unknown_effect", f"unknown effect: {effect.get('effect')}", path, f"$.choices[{choice_index}].effects[{effect_index}].effect", scene_id))
+
+        existing_issue_keys = {(item["code"], item["json_path"]) for item in issues}
+        known_references = {}
+        if self.workspace_root is not None:
+            known_references = {
+                (item["type"], item["id"]): item
+                for item in self.references()["references"]
+            }
+
+        def add_precise(code: str, message: str, json_path: str, suggestion: str | None = None) -> None:
+            key = (code, json_path)
+            if key in existing_issue_keys:
+                return
+            existing_issue_keys.add(key)
+            issues.append(_issue(code, message, path, json_path, scene_id, suggestion=suggestion))
+
+        def check_reference(reference_type: str | None, value: Any, json_path: str) -> None:
+            if not reference_type or not isinstance(value, str) or reference_type == "item":
+                return
+            target = known_references.get((reference_type, value))
+            if target is None or not target.get("valid", False):
+                add_precise(
+                    "reference.missing_target",
+                    f"找不到{_REFERENCE_LABELS.get(reference_type, reference_type)}引用：{value}",
+                    json_path,
+                    f"请选择已有的{_REFERENCE_LABELS.get(reference_type, reference_type)}。",
+                )
+
+        def check_arguments(kind: str, type_id: Any, args: Any, json_path: str) -> None:
+            if not isinstance(args, list):
+                add_precise("content.schema_violation", "参数必须是数组", json_path, "请使用结构化参数控件或 JSON 数组。")
+                return
+            item = next((entry for entry in registry.metadata() if entry.get("kind") == kind and entry.get("type_id") == type_id), None)
+            if item is None:
+                return
+            for index, parameter in enumerate(item.get("parameters", [])):
+                parameter_path = f"{json_path}[{index}]"
+                if parameter.get("required") and index >= len(args):
+                    add_precise("content.missing_parameter", f"缺少参数：{parameter.get('label', parameter.get('name'))}", parameter_path, "请补充该参数。")
+                    continue
+                if index < len(args):
+                    check_reference(parameter.get("reference_type"), args[index], parameter_path)
+
+        check_reference("location", document.get("scope", {}).get("location"), "$.scope.location")
+        for index, condition in enumerate(document.get("conditions", []) if isinstance(document.get("conditions"), list) else []):
+            if isinstance(condition, dict):
+                rule_id = condition.get("rule")
+                if rule_id not in _rule_ids(registry):
+                    add_precise("registry.unknown_rule", f"未知规则：{rule_id}", f"$.conditions[{index}].rule", "请选择 Registry 中已有的规则。")
+                check_arguments("rule", rule_id, condition.get("args", []), f"$.conditions[{index}].args")
+        for choice_index, choice in enumerate(document.get("choices", []) if isinstance(document.get("choices"), list) else []):
+            if not isinstance(choice, dict):
+                continue
+            for rule_index, condition in enumerate(choice.get("visible_if", []) if isinstance(choice.get("visible_if"), list) else []):
+                if isinstance(condition, dict):
+                    rule_id = condition.get("rule")
+                    base_path = f"$.choices[{choice_index}].visible_if[{rule_index}]"
+                    if rule_id not in _rule_ids(registry):
+                        add_precise("registry.unknown_rule", f"未知规则：{rule_id}", f"{base_path}.rule", "请选择 Registry 中已有的规则。")
+                    check_arguments("rule", rule_id, condition.get("args", []), f"{base_path}.args")
+            for effect_index, effect in enumerate(choice.get("effects", []) if isinstance(choice.get("effects"), list) else []):
+                if isinstance(effect, dict):
+                    effect_id = effect.get("effect")
+                    base_path = f"$.choices[{choice_index}].effects[{effect_index}]"
+                    if effect_id not in _effect_ids(registry):
+                        add_precise("registry.unknown_effect", f"未知效果：{effect_id}", f"{base_path}.effect", "请选择 Registry 中已有的效果。")
+                    check_arguments("effect", effect_id, effect.get("args", []), f"{base_path}.args")
         return {"passed": not issues, "issues": issues}
 
     def registry_metadata(self) -> dict[str, Any]:
@@ -559,6 +626,7 @@ def _scene_files(root: Path) -> list[Path]:
 
 
 _REFERENCE_TYPES = {"actor", "location", "item", "quest", "scene", "flag"}
+_REFERENCE_LABELS = {"actor": "角色", "location": "地点", "item": "物品", "quest": "任务", "scene": "场景", "flag": "Flag"}
 
 _SCENE_TEMPLATES = [
     {
@@ -649,10 +717,12 @@ def _atomic_json_write(path: Path, document: dict[str, Any]) -> None:
             os.unlink(temporary)
 
 
-def _issue(code: str, message: str, path: Path | None, json_path: str, scene_id: str | None = None) -> dict[str, Any]:
+def _issue(code: str, message: str, path: Path | None, json_path: str, scene_id: str | None = None, suggestion: str | None = None) -> dict[str, Any]:
     item = {"severity": "error", "code": code, "message": message, "file": str(path) if path else None, "json_path": json_path}
     if scene_id:
         item["scene_id"] = scene_id
+    if suggestion:
+        item["suggestion"] = suggestion
     return item
 
 

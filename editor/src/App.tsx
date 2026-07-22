@@ -23,6 +23,7 @@ function App() {
   const [references, setReferences] = useState<ReferenceItem[]>([]);
   const [sceneTemplates, setSceneTemplates] = useState<SceneTemplate[]>([]);
   const [wizardOpen, setWizardOpen] = useState(false);
+  const [focusedPath, setFocusedPath] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [state, setState] = useState<Record<string, unknown> | null>(null);
   const [stateDiff, setStateDiff] = useState<Record<string, unknown> | null>(null);
@@ -71,6 +72,21 @@ function App() {
     if (selected) setRawJson(JSON.stringify(selected.document, null, 2));
   }, [selected]);
 
+  useEffect(() => {
+    if (!selected || !rawJson) return;
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      try {
+        const document = JSON.parse(rawJson) as Record<string, unknown>;
+        const result = await api.validateDocument(document);
+        if (!cancelled) setIssues(result.issues);
+      } catch (error) {
+        if (!cancelled) setIssues([{ severity: "error", code: "content.invalid_json", message: error instanceof Error ? error.message : "JSON 语法无效", file: null, json_path: "$" }]);
+      }
+    }, 350);
+    return () => { cancelled = true; window.clearTimeout(timer); };
+  }, [rawJson, selected?.id]);
+
   const validate = async () => {
     try {
       const result = await api.validate();
@@ -85,6 +101,12 @@ function App() {
     if (!selected) return;
     try {
       const document = JSON.parse(rawJson) as Record<string, unknown>;
+      const validation = await api.validateDocument(document);
+      setIssues(validation.issues);
+      if (!validation.passed) {
+        setMessage("当前文档存在错误，修复后才能保存");
+        return;
+      }
       const next = await api.saveScene(selected.id, document, selected.revision);
       setSelected(next);
       setScenes((items) => items.map((item) => item.id === next.id ? next : item));
@@ -94,6 +116,12 @@ function App() {
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "保存失败");
     }
+  };
+
+  const focusDiagnostic = (issue: Diagnostic) => {
+    const path = issue.json_path.replace(/\.rule$|\.effect$|\.args\[\d+\]$/, "");
+    setFocusedPath(path || "$");
+    setTab("form");
   };
 
   const discardDraft = () => {
@@ -218,7 +246,7 @@ function App() {
         </div>
         <div className="top-actions">
           <button onClick={validate}><CheckCircle2 size={16} />校验</button>
-          <button onClick={discardDraft} disabled={!isDirty}><RotateCcw size={16} />撤销草稿</button><button className="primary" onClick={save} disabled={!selected || !isDirty}><Save size={16} />保存</button>
+          <button onClick={discardDraft} disabled={!isDirty}><RotateCcw size={16} />撤销草稿</button><button className="primary" onClick={save} disabled={!selected || !isDirty || issues.some((issue) => issue.severity === "error")}><Save size={16} />保存</button>
         </div>
       </header>
       <div className="statusbar"><span className={issues.length ? "status-error" : "status-ok"}>{issues.length ? <CircleAlert size={14} /> : <CheckCircle2 size={14} />}{message}</span>{workspace && <span>{workspace.scene_count} 个场景 · {workspace.state_path}</span>}</div>
@@ -242,7 +270,7 @@ function App() {
             <button className={tab === "state" ? "active" : ""} onClick={() => setTab("state")}>World State</button>
           </nav>
           {!selected && <div className="empty">打开一个真实内容包开始编辑。</div>}
-          {selected && tab === "form" && <SceneForm document={formDocument} updateField={updateField} registryItems={registryItems} references={references} />}
+          {selected && tab === "form" && <SceneForm document={formDocument} updateField={updateField} registryItems={registryItems} references={references} focusedPath={focusedPath} />}
           {selected && tab === "json" && <div className="monaco-wrap"><Editor height="560px" language="json" theme="vs-dark" value={rawJson} onChange={(value) => setRawJson(value ?? "")} options={{ minimap: { enabled: false }, fontSize: 13, wordWrap: "on" }} /></div>}
           {tab === "graph" && <div className="graph-view"><div className="viz-controls"><label>节点类型<select value={graphTypeFilter} onChange={(event) => setGraphTypeFilter(event.target.value)}><option value="all">全部</option>{graphNodeTypes.map((type) => <option key={type} value={type}>{type}</option>)}</select></label><label>引用关系<select value={graphRelationFilter} onChange={(event) => setGraphRelationFilter(event.target.value)}><option value="all">全部</option>{graphRelations.map((relation) => <option key={relation} value={relation}>{relation}</option>)}</select></label></div><div className="graph-wrap"><CytoscapeComponent elements={graphElements} stylesheet={graphStyle} layout={{ name: "cose", animate: false }} style={{ width: "100%", height: "620px" }} cy={(instance: any) => instance.on("tap", "node", (event: any) => setMessage(`节点：${event.target.data("label")} · 类型：${event.target.data("type")}`))} /></div></div>}
           {tab === "runtime" && <RuntimePanel commandText={commandText} setCommandText={setCommandText} runCommand={runCommand} trace={trace} candidates={candidates} stateDiff={stateDiff} changedByPath={changedByPath} setChangedByPath={setChangedByPath} inspectChangedBy={inspectChangedBy} changedByMatches={changedByMatches} />}
@@ -263,7 +291,7 @@ function App() {
       </main>
       <section className="diagnostics">
         <div className="panel-title">问题与 Trace</div>
-        {issues.length ? issues.map((issue, index) => <div className="diagnostic" key={`${issue.code}-${index}`}><CircleAlert size={14} /><code>{issue.code}</code><span>{issue.message}</span><span className="muted">{issue.file ?? "当前文档"} {issue.json_path}</span></div>) : <div className="diagnostic-empty">暂无校验问题。运行预览结果会显示在“运行预览”视图中。</div>}
+        {issues.length ? issues.map((issue, index) => <div className="diagnostic" role="button" tabIndex={0} key={`${issue.code}-${index}`} onClick={() => focusDiagnostic(issue)} onKeyDown={(event) => { if (event.key === "Enter") focusDiagnostic(issue); }}><CircleAlert size={14} /><code>{issue.code}</code><span>{issue.message}</span><span className="muted">{issue.file ?? "当前文档"} {issue.json_path}</span>{issue.suggestion && <span className="muted">建议：{issue.suggestion}</span>}</div>) : <div className="diagnostic-empty">暂无校验问题。运行预览结果会显示在“运行预览”视图中。</div>}
       </section>
       <SceneWizard open={wizardOpen} templates={sceneTemplates} references={references} onClose={() => setWizardOpen(false)} onCreate={createFromTemplate} />
     </div>
@@ -326,7 +354,7 @@ function SceneWizard({ open, templates, references, onClose, onCreate }: { open:
   </div></div>;
 }
 
-function SceneForm({ document, updateField, registryItems, references }: { document: Record<string, any>; updateField: (path: string, value: unknown) => void; registryItems: RegistryItem[]; references: ReferenceItem[] }) {
+function SceneForm({ document, updateField, registryItems, references, focusedPath }: { document: Record<string, any>; updateField: (path: string, value: unknown) => void; registryItems: RegistryItem[]; references: ReferenceItem[]; focusedPath: string | null }) {
   const rules = registryItems.filter((item) => item.kind === "rule");
   const effects = registryItems.filter((item) => item.kind === "effect");
   const conditions = Array.isArray(document.conditions) ? document.conditions : [];
@@ -357,8 +385,18 @@ function SceneForm({ document, updateField, registryItems, references }: { docum
   const updateConditions = (next: unknown[]) => updateField("conditions", next);
   const updateChoiceList = (next: unknown[]) => updateField("choices", next);
   const removeChoice = (index: number) => { if (choices.length > 1) updateChoiceList(choices.filter((_, itemIndex) => itemIndex !== index)); };
+  useEffect(() => {
+    if (!focusedPath) return;
+    const target = globalThis.document.querySelector(`[data-json-path="${CSS.escape(focusedPath)}"]`);
+    if (!target) return;
+    target.scrollIntoView({ behavior: "smooth", block: "center" });
+    target.classList.add("field-focused");
+    const timer = window.setTimeout(() => target.classList.remove("field-focused"), 1600);
+    return () => window.clearTimeout(timer);
+  }, [focusedPath]);
   return <div className="form-view">
     <div className="form-header"><div><p className="eyebrow">SCENE</p><h1>{document.id ?? "未命名场景"}</h1></div><span className="badge">{document.repeat_policy ?? "always"}</span></div>
+    {focusedPath && <div className="field-focus">已定位到：<code>{focusedPath}</code></div>}
     <div className="form-grid">
       <label>场景 ID<input value={document.id ?? ""} onChange={(event) => updateField("id", event.target.value)} /></label>
       <label>优先级<input type="number" value={document.priority ?? 0} onChange={(event) => updateField("priority", Number(event.target.value))} /></label>
@@ -367,7 +405,7 @@ function SceneForm({ document, updateField, registryItems, references }: { docum
     </div>
     <label className="wide-field">场景正文<textarea rows={6} value={document.text ?? ""} onChange={(event) => updateField("text", event.target.value)} /></label>
     <div className="subsection"><div className="subsection-title">条件规则 <span>{conditions.length}</span></div>
-      {conditions.map((condition: any, index: number) => <div className="rule-row" key={index}>
+      {conditions.map((condition: any, index: number) => <div className="rule-row" data-json-path={`$.conditions[${index}]`} key={index}>
         <div className="rule-selector"><select value={condition.rule ?? ""} onChange={(event) => replaceConditionType(index, event.target.value)}>{condition.rule && !findRule(condition.rule) && <option value={condition.rule}>{condition.rule}（未知）</option>}{rules.map((rule) => <option key={rule.type_id} value={rule.type_id}>{rule.label} · {rule.type_id}</option>)}</select><span className="field-help">{findRule(condition.rule)?.description ?? "请在 JSON 高级模式中检查该规则。"}</span><div className="row-actions"><button title="复制条件" aria-label="复制条件" onClick={() => updateConditions([...conditions.slice(0, index + 1), structuredClone(condition), ...conditions.slice(index + 1)])}><Copy size={13} /></button><button title="上移条件" aria-label="上移条件" disabled={index === 0} onClick={() => updateConditions(shift(conditions, index, -1))}><ArrowUp size={13} /></button><button title="下移条件" aria-label="下移条件" disabled={index === conditions.length - 1} onClick={() => updateConditions(shift(conditions, index, 1))}><ArrowDown size={13} /></button><button title="删除条件" aria-label="删除条件" onClick={() => updateConditions(conditions.filter((_, itemIndex) => itemIndex !== index))}><Trash2 size={13} /></button></div></div>
         <ArgumentFields item={findRule(condition.rule)} args={condition.args ?? []} references={references} onChange={(args) => updateCondition(index, { ...condition, args })} />
       </div>)}
@@ -378,14 +416,14 @@ function SceneForm({ document, updateField, registryItems, references }: { docum
         <div className="choice-heading"><strong>选项 {choiceIndex + 1}</strong><div className="row-actions"><button title="复制选项" aria-label="复制选项" onClick={() => updateChoiceList([...choices.slice(0, choiceIndex + 1), structuredClone(choice), ...choices.slice(choiceIndex + 1)])}><Copy size={13} /></button><button title="上移选项" aria-label="上移选项" disabled={choiceIndex === 0} onClick={() => updateChoiceList(shift(choices, choiceIndex, -1))}><ArrowUp size={13} /></button><button title="下移选项" aria-label="下移选项" disabled={choiceIndex === choices.length - 1} onClick={() => updateChoiceList(shift(choices, choiceIndex, 1))}><ArrowDown size={13} /></button><button title="删除选项" aria-label="删除选项" disabled={choices.length <= 1} onClick={() => removeChoice(choiceIndex)}><Trash2 size={13} /></button></div></div>
         <label>选项文本<input value={choice.text ?? ""} onChange={(event) => updateChoice(choiceIndex, { ...choice, text: event.target.value })} /></label>
         <div className="choice-conditions"><div className="subsection-title">显示条件 <span>{choice.visible_if?.length ?? 0}</span></div>
-          {(choice.visible_if ?? []).map((condition: any, conditionIndex: number) => <div className="rule-row" key={conditionIndex}>
+          {(choice.visible_if ?? []).map((condition: any, conditionIndex: number) => <div className="rule-row" data-json-path={`$.choices[${choiceIndex}].visible_if[${conditionIndex}]`} key={conditionIndex}>
             <div className="rule-selector"><select value={condition.rule ?? ""} onChange={(event) => replaceVisibleConditionType(choiceIndex, conditionIndex, event.target.value)}>{condition.rule && !findRule(condition.rule) && <option value={condition.rule}>{condition.rule}（未知）</option>}{rules.map((rule) => <option key={rule.type_id} value={rule.type_id}>{rule.label} · {rule.type_id}</option>)}</select><span className="field-help">{findRule(condition.rule)?.description ?? "请在 JSON 高级模式中检查该规则。"}</span><div className="row-actions"><button title="复制显示条件" aria-label="复制显示条件" onClick={() => { const visibleIf = [...choice.visible_if.slice(0, conditionIndex + 1), structuredClone(condition), ...choice.visible_if.slice(conditionIndex + 1)]; updateChoice(choiceIndex, { ...choice, visible_if: visibleIf }); }}><Copy size={13} /></button><button title="上移显示条件" aria-label="上移显示条件" disabled={conditionIndex === 0} onClick={() => updateChoice(choiceIndex, { ...choice, visible_if: shift(choice.visible_if, conditionIndex, -1) })}><ArrowUp size={13} /></button><button title="下移显示条件" aria-label="下移显示条件" disabled={conditionIndex === choice.visible_if.length - 1} onClick={() => updateChoice(choiceIndex, { ...choice, visible_if: shift(choice.visible_if, conditionIndex, 1) })}><ArrowDown size={13} /></button><button title="删除显示条件" aria-label="删除显示条件" onClick={() => updateChoice(choiceIndex, { ...choice, visible_if: choice.visible_if.filter((_: unknown, itemIndex: number) => itemIndex !== conditionIndex) })}><Trash2 size={13} /></button></div></div>
             <ArgumentFields item={findRule(condition.rule)} args={condition.args ?? []} references={references} onChange={(args) => { const visibleIf = [...choice.visible_if]; visibleIf[conditionIndex] = { ...condition, args }; updateChoice(choiceIndex, { ...choice, visible_if: visibleIf }); }} />
           </div>)}
           <button onClick={() => updateChoice(choiceIndex, { ...choice, visible_if: [...(choice.visible_if ?? []), { rule: rules[0]?.type_id ?? "flag.is_false", args: defaultArgs(rules[0]) }] })}>+ 添加显示条件</button>
         </div>
         <div className="choice-effects"><div className="subsection-title">执行效果 <span>{choice.effects?.length ?? 0}</span></div>
-          {(choice.effects ?? []).map((effect: any, effectIndex: number) => <div className="rule-row" key={effectIndex}>
+          {(choice.effects ?? []).map((effect: any, effectIndex: number) => <div className="rule-row" data-json-path={`$.choices[${choiceIndex}].effects[${effectIndex}]`} key={effectIndex}>
             <div className="rule-selector"><select value={effect.effect ?? ""} onChange={(event) => replaceEffectType(choiceIndex, effectIndex, event.target.value)}>{effect.effect && !findEffect(effect.effect) && <option value={effect.effect}>{effect.effect}（未知）</option>}{effects.map((item) => <option key={item.type_id} value={item.type_id}>{item.label} · {item.type_id}</option>)}</select><span className="field-help">{findEffect(effect.effect)?.description ?? "请在 JSON 高级模式中检查该效果。"}</span><div className="row-actions"><button title="复制效果" aria-label="复制效果" onClick={() => { const next = [...choice.effects.slice(0, effectIndex + 1), structuredClone(effect), ...choice.effects.slice(effectIndex + 1)]; updateChoice(choiceIndex, { ...choice, effects: next }); }}><Copy size={13} /></button><button title="上移效果" aria-label="上移效果" disabled={effectIndex === 0} onClick={() => updateChoice(choiceIndex, { ...choice, effects: shift(choice.effects, effectIndex, -1) })}><ArrowUp size={13} /></button><button title="下移效果" aria-label="下移效果" disabled={effectIndex === choice.effects.length - 1} onClick={() => updateChoice(choiceIndex, { ...choice, effects: shift(choice.effects, effectIndex, 1) })}><ArrowDown size={13} /></button><button title="删除效果" aria-label="删除效果" onClick={() => updateChoice(choiceIndex, { ...choice, effects: choice.effects.filter((_: unknown, itemIndex: number) => itemIndex !== effectIndex) })}><Trash2 size={13} /></button></div></div>
             <ArgumentFields item={findEffect(effect.effect)} args={effect.args ?? []} references={references} onChange={(args) => { const next = [...choice.effects]; next[effectIndex] = { ...effect, args }; updateChoice(choiceIndex, { ...choice, effects: next }); }} />
           </div>)}

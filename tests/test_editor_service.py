@@ -118,6 +118,19 @@ class EditorServiceTests(unittest.TestCase):
             self.assertFalse(missing["valid"])
             self.assertEqual(missing["source"], "content/scenes/market_baker.json")
 
+    def test_document_validation_locates_missing_reference_parameter(self) -> None:
+        service = EditorService()
+        service.open_workspace(MEDIEVAL_ROOT)
+        document = json.loads(json.dumps(service.scene("scene.greybrook.market_baker")["document"], ensure_ascii=False))
+        document["scope"]["location"] = "location.missing"
+        document["conditions"][0]["args"][0] = "actor.missing"
+
+        report = service.validate_document(document, None)
+        issues = {item["json_path"]: item for item in report["issues"]}
+        self.assertEqual(issues["$.scope.location"]["code"], "reference.missing_target")
+        self.assertEqual(issues["$.conditions[0].args[0]"]["code"], "reference.missing_target")
+        self.assertTrue(issues["$.conditions[0].args[0]"]["suggestion"])
+
     def test_scene_templates_preview_and_conflict_safe_creation(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = Path(temp_dir) / "town"

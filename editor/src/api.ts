@@ -12,6 +12,7 @@ export type Diagnostic = {
   file?: string | null;
   json_path: string;
   scene_id?: string;
+  suggestion?: string;
 };
 
 export type GraphData = {
@@ -82,6 +83,7 @@ export const api = {
   renameScene: (sceneId: string, newSceneId: string, revision: string) => request<SceneRecord>(`/api/content/scenes/${encodeURIComponent(sceneId)}/rename`, { method: "POST", body: JSON.stringify({ new_scene_id: newSceneId, revision }) }),
   deleteScene: (sceneId: string, revision: string) => request<{ deleted: string }>(`/api/content/scenes/${encodeURIComponent(sceneId)}?revision=${encodeURIComponent(revision)}`, { method: "DELETE" }),
   validate: () => request<{ passed: boolean; issues: Diagnostic[]; scene_count: number }>("/api/validation/content", { method: "POST" }),
+  validateDocument: (document: Record<string, unknown>) => request<{ passed: boolean; issues: Diagnostic[] }>("/api/validation/document", { method: "POST", body: JSON.stringify({ document }) }),
   graph: () => request<GraphData>("/api/graph/content"),
   registry: () => request<{ items: RegistryItem[] }>("/api/metadata/registry"),
   references: (type?: ReferenceItem["type"]) => request<{ references: ReferenceItem[] }>(`/api/metadata/references${type ? `?type=${encodeURIComponent(type)}` : ""}`),
