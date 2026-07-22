@@ -3,7 +3,7 @@ import Editor from "@monaco-editor/react";
 import CytoscapeComponent from "react-cytoscapejs";
 import cytoscape from "cytoscape";
 import { ArrowDown, ArrowUp, Braces, CheckCircle2, CircleAlert, Copy, FileJson, FolderOpen, GitBranch, Play, RotateCcw, Save, Sparkles, Trash2 } from "lucide-react";
-import { api, Diagnostic, GraphData, ReferenceItem, RegistryItem, SceneRecord, SceneTemplate } from "./api";
+import { api, Diagnostic, GraphData, ReferenceItem, RegistryItem, RuntimeAction, RuntimeActions, RuntimeSummary, SceneRecord, SceneTemplate } from "./api";
 
 type Tab = "form" | "json" | "graph" | "runtime" | "state";
 
@@ -29,6 +29,8 @@ function App() {
   const [stateDiff, setStateDiff] = useState<Record<string, unknown> | null>(null);
   const [trace, setTrace] = useState<Record<string, unknown> | null>(null);
   const [candidates, setCandidates] = useState<Record<string, unknown> | null>(null);
+  const [runtimeActions, setRuntimeActions] = useState<RuntimeActions | null>(null);
+  const [runtimeSummary, setRuntimeSummary] = useState<RuntimeSummary | null>(null);
   const [changedByMatches, setChangedByMatches] = useState<Record<string, unknown>[]>([]);
   const [changedByPath, setChangedByPath] = useState("entities.actor.player.components.location.current");
   const [commandText, setCommandText] = useState(JSON.stringify({ type: "space.travel_to", actor: "actor.player", target: "location.market_square", args: {} }, null, 2));
@@ -61,6 +63,9 @@ function App() {
       setReferences((await api.references()).references);
       setSceneTemplates((await api.sceneTemplates()).templates);
       setState((await api.sourceState()).state);
+      setSessionId(null);
+      setRuntimeActions(null);
+      setRuntimeSummary(null);
       setMessage(`已打开 ${result.root}`);
       setIssues([]);
     } catch (error) {
@@ -185,9 +190,37 @@ function App() {
     } catch (error) { setMessage(error instanceof Error ? error.message : "删除失败"); }
   };
 
-  const runCommand = async () => {
+  const startSession = async () => {
     try {
-      const command = JSON.parse(commandText) as Record<string, unknown>;
+      const created = await api.createSession();
+      setSessionId(created.session_id);
+      setState(created.state);
+      setTrace(null);
+      setStateDiff(null);
+      setCandidates(null);
+      setRuntimeSummary(null);
+      setRuntimeActions(await api.sessionActions(created.session_id));
+      setMessage("试玩会话已启动，操作列表来自真实引擎");
+    } catch (error) { setMessage(error instanceof Error ? error.message : "启动试玩失败"); }
+  };
+
+  const resetSession = async () => {
+    if (!sessionId) return;
+    try {
+      const result = await api.resetSession(sessionId);
+      setState(result.state);
+      setTrace(null);
+      setStateDiff(null);
+      setCandidates(null);
+      setRuntimeSummary(null);
+      setRuntimeActions(await api.sessionActions(sessionId));
+      setMessage("试玩会话已重置");
+    } catch (error) { setMessage(error instanceof Error ? error.message : "重置试玩失败"); }
+  };
+
+  const runCommand = async (commandOverride?: Record<string, unknown>) => {
+    try {
+      const command = commandOverride ?? JSON.parse(commandText) as Record<string, unknown>;
       let activeSessionId = sessionId;
       let beforeState = state;
       if (!activeSessionId) {
@@ -202,6 +235,8 @@ function App() {
       setState(result.state);
       setTrace(result.trace);
       setCandidates(await api.candidates(activeSessionId));
+      setRuntimeSummary(result.summary);
+      setRuntimeActions(await api.sessionActions(activeSessionId));
       setMessage(result.status === "succeeded" ? "命令执行成功，源 world state 未被修改" : "命令执行失败，详情见 trace");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "回放失败");
@@ -273,7 +308,7 @@ function App() {
           {selected && tab === "form" && <SceneForm document={formDocument} updateField={updateField} registryItems={registryItems} references={references} focusedPath={focusedPath} />}
           {selected && tab === "json" && <div className="monaco-wrap"><Editor height="560px" language="json" theme="vs-dark" value={rawJson} onChange={(value) => setRawJson(value ?? "")} options={{ minimap: { enabled: false }, fontSize: 13, wordWrap: "on" }} /></div>}
           {tab === "graph" && <div className="graph-view"><div className="viz-controls"><label>节点类型<select value={graphTypeFilter} onChange={(event) => setGraphTypeFilter(event.target.value)}><option value="all">全部</option>{graphNodeTypes.map((type) => <option key={type} value={type}>{type}</option>)}</select></label><label>引用关系<select value={graphRelationFilter} onChange={(event) => setGraphRelationFilter(event.target.value)}><option value="all">全部</option>{graphRelations.map((relation) => <option key={relation} value={relation}>{relation}</option>)}</select></label></div><div className="graph-wrap"><CytoscapeComponent elements={graphElements} stylesheet={graphStyle} layout={{ name: "cose", animate: false }} style={{ width: "100%", height: "620px" }} cy={(instance: any) => instance.on("tap", "node", (event: any) => setMessage(`节点：${event.target.data("label")} · 类型：${event.target.data("type")}`))} /></div></div>}
-          {tab === "runtime" && <RuntimePanel commandText={commandText} setCommandText={setCommandText} runCommand={runCommand} trace={trace} candidates={candidates} stateDiff={stateDiff} changedByPath={changedByPath} setChangedByPath={setChangedByPath} inspectChangedBy={inspectChangedBy} changedByMatches={changedByMatches} />}
+          {tab === "runtime" && <RuntimePanel commandText={commandText} setCommandText={setCommandText} runCommand={runCommand} startSession={startSession} resetSession={resetSession} actions={runtimeActions} summary={runtimeSummary} trace={trace} candidates={candidates} stateDiff={stateDiff} changedByPath={changedByPath} setChangedByPath={setChangedByPath} inspectChangedBy={inspectChangedBy} changedByMatches={changedByMatches} />}
           {tab === "state" && <div className="state-view"><pre>{JSON.stringify(state ?? {}, null, 2)}</pre></div>}
         </section>
         <aside className="inspector">
@@ -455,8 +490,20 @@ function ArgumentFields({ item, args, references, onChange }: { item?: RegistryI
   })}</div>;
 }
 
-function RuntimePanel({ commandText, setCommandText, runCommand, trace, candidates, stateDiff, changedByPath, setChangedByPath, inspectChangedBy, changedByMatches }: { commandText: string; setCommandText: (value: string) => void; runCommand: () => void; trace: Record<string, unknown> | null; candidates: Record<string, unknown> | null; stateDiff: Record<string, unknown> | null; changedByPath: string; setChangedByPath: (value: string) => void; inspectChangedBy: () => void; changedByMatches: Record<string, unknown>[] }) {
-  return <div className="runtime-view"><div className="runtime-toolbar"><div><p className="eyebrow">ISOLATED SESSION</p><h1>运行预览</h1></div><button className="primary" onClick={runCommand}><Play size={16} />执行命令</button></div><textarea className="command-editor" value={commandText} onChange={(event) => setCommandText(event.target.value)} aria-label="命令 JSON" /><div className="runtime-results"><div><h2>Trace</h2><pre>{JSON.stringify(trace ?? {}, null, 2)}</pre></div><div><h2>场景候选</h2><pre>{JSON.stringify(candidates ?? {}, null, 2)}</pre></div><div><h2>State Diff</h2><pre>{JSON.stringify(stateDiff ?? {}, null, 2)}</pre></div><div><h2>Changed By</h2><div className="changed-by-controls"><input value={changedByPath} onChange={(event) => setChangedByPath(event.target.value)} aria-label="状态字段路径" /><button onClick={inspectChangedBy}>查询</button></div><pre>{JSON.stringify(changedByMatches, null, 2)}</pre></div></div></div>;
+function RuntimePanel({ commandText, setCommandText, runCommand, startSession, resetSession, actions, summary, trace, candidates, stateDiff, changedByPath, setChangedByPath, inspectChangedBy, changedByMatches }: { commandText: string; setCommandText: (value: string) => void; runCommand: (command?: Record<string, unknown>) => void; startSession: () => void; resetSession: () => void; actions: RuntimeActions | null; summary: RuntimeSummary | null; trace: Record<string, unknown> | null; candidates: Record<string, unknown> | null; stateDiff: Record<string, unknown> | null; changedByPath: string; setChangedByPath: (value: string) => void; inspectChangedBy: () => void; changedByMatches: Record<string, unknown>[] }) {
+  const travelActions = actions?.actions.filter((action) => action.kind === "travel") ?? [];
+  const choiceActions = actions?.actions.filter((action) => action.kind === "choice") ?? [];
+  return <div className="runtime-view">
+    <div className="runtime-toolbar"><div><p className="eyebrow">ISOLATED SESSION</p><h1>试玩控制台</h1></div>{actions ? <button onClick={resetSession}><RotateCcw size={16} />重置会话</button> : <button className="primary" onClick={startSession}><Play size={16} />启动试玩</button>}</div>
+    {!actions && <div className="play-empty">启动后，操作按钮会由 Python 引擎根据当前世界状态生成。</div>}
+    {actions && <>
+      <div className="play-context"><span>角色：{actions.actor.label}</span><span>地点：{actions.location.label ?? actions.location.id}</span><span>时间：第 {actions.time.day ?? "-"} 天 · {actions.time.period ?? "-"} · 刻度 {actions.time.tick ?? "-"}</span></div>
+      {actions.scene && <section className="play-scene"><p className="eyebrow">CURRENT SCENE</p><h2>{actions.scene.id}</h2><p className="scene-copy">{actions.scene.text}</p><div className="play-actions">{choiceActions.map((action) => <button className="play-action" key={action.id} disabled={!action.enabled} onClick={() => runCommand(action.command)}><Play size={14} />{action.label}</button>)}</div></section>}
+      <section className="play-section"><div className="subsection-title">可前往地点 <span>{travelActions.length}</span></div><div className="play-actions">{travelActions.map((action) => <button className="play-action" key={action.id} disabled={!action.enabled} onClick={() => runCommand(action.command)}>{action.label}</button>)}</div>{!travelActions.length && <span className="field-help">当前地点没有可用移动操作。</span>}</section>
+      {summary && <section className="play-summary"><h2>{summary.headline}</h2>{summary.lines.length ? <ul>{summary.lines.map((line, index) => <li key={`${line}-${index}`}>{line}</li>)}</ul> : <span className="field-help">没有状态字段变化。</span>}</section>}
+      <details className="advanced-details"><summary>高级详情</summary><textarea className="command-editor" value={commandText} onChange={(event) => setCommandText(event.target.value)} aria-label="命令 JSON" /><button className="primary" onClick={() => runCommand()}><Play size={15} />执行 JSON 命令</button><div className="runtime-results"><div><h2>Trace</h2><pre>{JSON.stringify(trace ?? {}, null, 2)}</pre></div><div><h2>场景候选</h2><pre>{JSON.stringify(candidates ?? {}, null, 2)}</pre></div><div><h2>State Diff</h2><pre>{JSON.stringify(stateDiff ?? {}, null, 2)}</pre></div><div><h2>Changed By</h2><div className="changed-by-controls"><input value={changedByPath} onChange={(event) => setChangedByPath(event.target.value)} aria-label="状态字段路径" /><button onClick={inspectChangedBy}>查询</button></div><pre>{JSON.stringify(changedByMatches, null, 2)}</pre></div></div></details>
+    </>}
+  </div>;
 }
 
 const graphStyle: any[] = [

@@ -17,6 +17,8 @@ from text_sandbox_engine.builtins import register_builtins
 from text_sandbox_engine.content import ContentRepository
 from text_sandbox_engine.debug import changed_by_report, replay_commands, scene_candidate_report
 from text_sandbox_engine.diagnostics import state_diff, to_plain_data
+from text_sandbox_engine.engines import RuleEngine
+from text_sandbox_engine.models import Command, RuleRef
 from text_sandbox_engine.persistence import load_world_state
 from text_sandbox_engine.registry import Registry
 from text_sandbox_engine.runtime import Runtime
@@ -485,16 +487,131 @@ class EditorService:
         session = self._sessions.get(session_id)
         if session is None:
             raise KeyError(f"session not found: {session_id}")
+        before = session["runtime"].snapshot()
         result = session["runtime"].execute(command)
         trace = to_plain_data(result.trace)
         session["traces"].append(trace)
-        return {"status": result.status, "trace": trace, "state": result.state, "traces": session["traces"]}
+        return {
+            "status": result.status,
+            "trace": trace,
+            "state": result.state,
+            "traces": session["traces"],
+            "summary": self._command_summary(command, trace, before, result.state),
+        }
 
     def session_state(self, session_id: str) -> dict[str, Any]:
         session = self._sessions.get(session_id)
         if session is None:
             raise KeyError(f"session not found: {session_id}")
         return {"state": session["runtime"].snapshot(), "traces": session["traces"]}
+
+    def reset_session(self, session_id: str) -> dict[str, Any]:
+        session = self._sessions.get(session_id)
+        if session is None:
+            raise KeyError(f"session not found: {session_id}")
+        assert self.state_path is not None and self.content_root is not None
+        session["runtime"] = Runtime.from_file(self.state_path, content_path=self.content_root)
+        session["traces"] = []
+        session["source_revision"] = _revision(self.state_path)
+        return {"session_id": session_id, "state": session["runtime"].snapshot(), "traces": []}
+
+    def session_actions(self, session_id: str, actor: str = "actor.player") -> dict[str, Any]:
+        session = self._sessions.get(session_id)
+        if session is None:
+            raise KeyError(f"session not found: {session_id}")
+        state = session["runtime"].snapshot()
+        actor_state = state.get("entities", {}).get(actor, {})
+        components = actor_state.get("components", {}) if isinstance(actor_state, dict) else {}
+        current_location = components.get("location", {}).get("current") if isinstance(components, dict) else None
+        labels = {(item["type"], item["id"]): item["label"] for item in self.references()["references"]}
+        actions: list[dict[str, Any]] = []
+        locations: list[dict[str, Any]] = []
+        current_entity = state.get("entities", {}).get(current_location, {})
+        connections = current_entity.get("components", {}).get("map_node", {}).get("connections", []) if isinstance(current_entity, dict) else []
+        for location in connections if isinstance(connections, list) else []:
+            location_id = str(location)
+            location_label = labels.get(("location", location_id), location_id)
+            location_action = {
+                "id": f"travel:{location_id}",
+                "kind": "travel",
+                "label": f"前往：{location_label}",
+                "description": location_id,
+                "enabled": True,
+                "command": {"type": "space.travel_to", "actor": actor, "target": location_id, "args": {}},
+            }
+            locations.append({"id": location_id, "label": location_label, "action_id": location_action["id"]})
+            actions.append(location_action)
+
+        candidate_report = self.candidate_report(session_id, actor)
+        selected_id = candidate_report.get("selected")
+        scene_summary: dict[str, Any] | None = None
+        if selected_id:
+            scene = self.scene(selected_id)["document"]
+            repository = ContentRepository.from_path(self.content_root, registry=self._registry())
+            rule_engine = RuleEngine(self._registry())
+            context = {"command": Command(type="diagnostic.scene_report", actor=actor), "content_repository": repository}
+            choices: list[dict[str, Any]] = []
+            for index, choice in enumerate(scene.get("choices", [])):
+                visible = True
+                reason = "显示条件满足"
+                for rule in choice.get("visible_if", []) if isinstance(choice, dict) else []:
+                    if not isinstance(rule, dict):
+                        continue
+                    result = rule_engine.evaluate(RuleRef(str(rule.get("rule")), list(rule.get("args", []))), state, context)
+                    if not result.passed:
+                        visible = False
+                        reason = result.reason
+                        break
+                choice_data = {"index": index, "text": choice.get("text", f"选项 {index + 1}"), "visible": visible, "reason": reason}
+                choices.append(choice_data)
+                if visible:
+                    actions.append({
+                        "id": f"choice:{selected_id}:{index}",
+                        "kind": "choice",
+                        "label": str(choice_data["text"]),
+                        "description": f"{selected_id} · 选项 {index + 1}",
+                        "enabled": True,
+                        "command": {"type": "narrative.choose", "actor": actor, "target": selected_id, "args": {"choice_index": index}},
+                    })
+            scene_summary = {"id": selected_id, "text": scene.get("text", ""), "choices": choices}
+
+        clock = state.get("globals", {}).get("clock", {})
+        return {
+            "actor": {"id": actor, "label": labels.get(("actor", actor), actor)},
+            "location": {"id": current_location, "label": labels.get(("location", current_location), current_location)},
+            "time": {"day": clock.get("day"), "period": clock.get("period"), "tick": clock.get("tick")},
+            "scene": scene_summary,
+            "available_locations": locations,
+            "actions": actions,
+        }
+
+    def _command_summary(self, command: dict[str, Any], trace: dict[str, Any], before: dict[str, Any], after: dict[str, Any]) -> dict[str, Any]:
+        if trace.get("status") != "succeeded":
+            reason = trace.get("failure_reason") or "引擎拒绝了该操作"
+            return {"headline": "操作失败", "lines": [str(reason)], "changes": []}
+        command_type = str(command.get("type", "操作"))
+        headline = "操作成功"
+        if command_type == "narrative.choose":
+            scene_id = str(command.get("target") or command.get("args", {}).get("scene_id", ""))
+            choice_index = int(command.get("args", {}).get("choice_index", 0))
+            try:
+                choice = self.scene(scene_id)["document"].get("choices", [])[choice_index]
+                headline = f"操作成功：{choice.get('text', f'选择 {choice_index + 1}') }"
+            except (IndexError, KeyError, TypeError):
+                headline = "操作成功：选择场景选项"
+        elif command_type == "space.travel_to":
+            target = str(command.get("target", ""))
+            label = next((item["label"] for item in self.references("location")["references"] if item["id"] == target), target)
+            headline = f"操作成功：前往 {label}"
+        lines: list[str] = []
+        changes: list[dict[str, Any]] = []
+        for change in trace.get("changeset", {}).get("changes", []):
+            path = change.get("path", [])
+            path_text = ".".join(str(part) for part in path)
+            line = _human_change(path, change.get("before"), change.get("after"), self.references()["references"])
+            lines.append(line)
+            changes.append({"path": path_text, "before": change.get("before"), "after": change.get("after"), "label": line})
+        return {"headline": headline, "lines": lines, "changes": changes}
 
     def candidate_report(self, session_id: str | None = None, actor: str = "actor.player") -> dict[str, Any]:
         if session_id:
@@ -683,6 +800,33 @@ def _document_reference_values(document: dict[str, Any]) -> list[tuple[str, tupl
             if isinstance(effect, dict) and isinstance(effect.get("args"), list):
                 values.append(("effect", (str(effect.get("effect", "")), effect["args"])))
     return values
+
+
+def _human_change(path: list[Any], before: Any, after: Any, references: list[dict[str, Any]]) -> str:
+    labels = {(item["type"], item["id"]): item["label"] for item in references}
+    if len(path) >= 2 and path[0] == "flags":
+        return f"Flag {path[1]}：{_display_value(before)} → {_display_value(after)}"
+    if len(path) >= 5 and path[0] == "entities" and path[2:5] == ["components", "location", "current"]:
+        return f"当前地点：{labels.get(('location', after), after)}"
+    if len(path) >= 5 and path[0] == "entities" and path[2:4] == ["components", "relationship"]:
+        return f"{labels.get(('actor', path[1]), path[1])}的信任度：{before} → {after}"
+    if len(path) >= 4 and path[0] == "globals" and path[1] == "quests" and path[3] == "stage":
+        return f"任务 {labels.get(('quest', path[2]), path[2])} 阶段：{before} → {after}"
+    if path[:3] == ["globals", "narrative", "seen_scenes"]:
+        return "当前场景已记录为看过"
+    if len(path) >= 5 and path[0] == "entities" and path[2:4] == ["components", "inventory"]:
+        return "玩家物品清单已更新"
+    return f"状态变化：{'.'.join(str(part) for part in path)}：{_display_value(before)} → {_display_value(after)}"
+
+
+def _display_value(value: Any) -> str:
+    if value is True:
+        return "是"
+    if value is False:
+        return "否"
+    if value is None:
+        return "空"
+    return str(value)
 
 
 def _load_json(path: Path) -> dict[str, Any]:

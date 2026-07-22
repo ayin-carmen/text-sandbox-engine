@@ -198,6 +198,20 @@ def create_app(service: EditorService | None = None) -> FastAPI:
         except KeyError as exc:
             raise HTTPException(404, str(exc)) from exc
 
+    @app.get("/api/runtime/sessions/{session_id}/actions")
+    def session_actions(session_id: str, actor: str = "actor.player"):
+        try:
+            return editor.session_actions(session_id, actor)
+        except KeyError as exc:
+            raise HTTPException(404, str(exc)) from exc
+
+    @app.post("/api/runtime/sessions/{session_id}/reset")
+    def reset_session(session_id: str):
+        try:
+            return editor.reset_session(session_id)
+        except KeyError as exc:
+            raise HTTPException(404, str(exc)) from exc
+
     @app.post("/api/diagnostics/scene-candidates")
     def scene_candidates(payload: CandidateRequest):
         return editor.candidate_report(payload.session_id, payload.actor)

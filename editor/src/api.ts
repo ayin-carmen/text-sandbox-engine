@@ -58,6 +58,31 @@ export type SceneTemplate = {
   document: Record<string, unknown>;
 };
 
+export type RuntimeAction = {
+  id: string;
+  kind: "travel" | "choice" | string;
+  label: string;
+  description?: string;
+  enabled: boolean;
+  reason?: string;
+  command: Record<string, unknown>;
+};
+
+export type RuntimeActions = {
+  actor: { id: string; label: string };
+  location: { id: string | null; label: string | null };
+  time: { day?: number; period?: string; tick?: number };
+  scene: { id: string; text: string; choices: Array<{ index: number; text: string; visible: boolean; reason: string }> } | null;
+  available_locations: Array<{ id: string; label: string; action_id: string }>;
+  actions: RuntimeAction[];
+};
+
+export type RuntimeSummary = {
+  headline: string;
+  lines: string[];
+  changes: Array<{ path: string; before: unknown; after: unknown; label: string }>;
+};
+
 const base = import.meta.env.DEV ? "" : "http://127.0.0.1:8765";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -90,7 +115,9 @@ export const api = {
   sceneTemplates: () => request<{ templates: SceneTemplate[] }>("/api/metadata/scene-templates"),
   sceneFromTemplate: (payload: { name: string; namespace: string; slug: string; location: string; template: string; repeat_policy: string; priority: number; preview: boolean }) => request<{ id: string; requested_id: string; template: string; document: Record<string, unknown>; issues: Diagnostic[]; passed: boolean; conflict_resolved: boolean; scene?: SceneRecord }>("/api/content/scenes/from-template", { method: "POST", body: JSON.stringify(payload) }),
   createSession: () => request<{ session_id: string; state: Record<string, unknown>; traces: unknown[] }>("/api/runtime/sessions", { method: "POST" }),
-  command: (sessionId: string, command: Record<string, unknown>) => request<{ status: string; trace: Record<string, unknown>; state: Record<string, unknown>; traces: unknown[] }>(`/api/runtime/sessions/${sessionId}/commands`, { method: "POST", body: JSON.stringify({ command }) }),
+  command: (sessionId: string, command: Record<string, unknown>) => request<{ status: string; trace: Record<string, unknown>; state: Record<string, unknown>; traces: unknown[]; summary: RuntimeSummary }>(`/api/runtime/sessions/${sessionId}/commands`, { method: "POST", body: JSON.stringify({ command }) }),
+  sessionActions: (sessionId: string) => request<RuntimeActions>(`/api/runtime/sessions/${sessionId}/actions`),
+  resetSession: (sessionId: string) => request<{ session_id: string; state: Record<string, unknown>; traces: unknown[] }>(`/api/runtime/sessions/${sessionId}/reset`, { method: "POST" }),
   candidates: (sessionId?: string) => request<Record<string, unknown>>("/api/diagnostics/scene-candidates", { method: "POST", body: JSON.stringify({ session_id: sessionId ?? null }) }),
   stateDiff: (before: Record<string, unknown>, after: Record<string, unknown>) => request<{ changes: Array<Record<string, unknown>> }>("/api/diagnostics/state-diff", { method: "POST", body: JSON.stringify({ before, after }) }),
   changedBy: (trace: Record<string, unknown>, path: string) => request<{ matches: Array<Record<string, unknown>> }>("/api/diagnostics/changed-by", { method: "POST", body: JSON.stringify({ trace, path }) }),

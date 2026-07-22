@@ -131,6 +131,23 @@ class EditorServiceTests(unittest.TestCase):
         self.assertEqual(issues["$.conditions[0].args[0]"]["code"], "reference.missing_target")
         self.assertTrue(issues["$.conditions[0].args[0]"]["suggestion"])
 
+    def test_session_actions_summary_and_reset(self) -> None:
+        service = EditorService()
+        service.open_workspace(MEDIEVAL_ROOT)
+        session = service.create_session()
+
+        actions = service.session_actions(session["session_id"])
+        self.assertEqual(actions["location"]["id"], "location.west_gate")
+        self.assertTrue(any(action["kind"] == "choice" for action in actions["actions"]))
+        choice = next(action for action in actions["actions"] if action["kind"] == "choice")
+        result = service.session_command(session["session_id"], choice["command"])
+        self.assertIn("操作成功", result["summary"]["headline"])
+        self.assertTrue(any("met_guard" in line for line in result["summary"]["lines"]))
+
+        reset = service.reset_session(session["session_id"])
+        self.assertEqual(reset["traces"], [])
+        self.assertFalse(reset["state"]["flags"]["met_guard"])
+
     def test_scene_templates_preview_and_conflict_safe_creation(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = Path(temp_dir) / "town"
