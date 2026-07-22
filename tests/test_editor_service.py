@@ -118,6 +118,42 @@ class EditorServiceTests(unittest.TestCase):
             self.assertFalse(missing["valid"])
             self.assertEqual(missing["source"], "content/scenes/market_baker.json")
 
+    def test_scene_templates_preview_and_conflict_safe_creation(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir) / "town"
+            shutil.copytree(MEDIEVAL_ROOT, workspace)
+            service = EditorService()
+            service.open_workspace(workspace)
+
+            templates = service.scene_templates()["templates"]
+            self.assertIn("npc_dialogue", {item["id"] for item in templates})
+            preview = service.scene_from_template(
+                name="集市问候",
+                namespace="greybrook",
+                slug="market_baker",
+                location="location.market_square",
+                template_id="narrative",
+                repeat_policy="once",
+                priority=4,
+                preview=True,
+            )
+            self.assertTrue(preview["passed"])
+            self.assertTrue(preview["conflict_resolved"])
+            self.assertEqual(preview["id"], "scene.greybrook.market_baker_2")
+            self.assertFalse((workspace / "content" / "scenes" / "market_baker_2.json").exists())
+
+            created = service.scene_from_template(
+                name="新的守卫对话",
+                namespace="greybrook",
+                slug="new_guard_dialogue",
+                location="location.west_gate",
+                template_id="npc_dialogue",
+                repeat_policy="always",
+                priority=1,
+            )
+            self.assertEqual(created["scene"]["id"], "scene.greybrook.new_guard_dialogue")
+            self.assertTrue(Path(created["scene"]["path"]).exists())
+
 
 if __name__ == "__main__":
     unittest.main()

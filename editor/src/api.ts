@@ -50,6 +50,13 @@ export type ReferenceItem = {
   valid: boolean;
 };
 
+export type SceneTemplate = {
+  id: string;
+  label: string;
+  description: string;
+  document: Record<string, unknown>;
+};
+
 const base = import.meta.env.DEV ? "" : "http://127.0.0.1:8765";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -78,6 +85,8 @@ export const api = {
   graph: () => request<GraphData>("/api/graph/content"),
   registry: () => request<{ items: RegistryItem[] }>("/api/metadata/registry"),
   references: (type?: ReferenceItem["type"]) => request<{ references: ReferenceItem[] }>(`/api/metadata/references${type ? `?type=${encodeURIComponent(type)}` : ""}`),
+  sceneTemplates: () => request<{ templates: SceneTemplate[] }>("/api/metadata/scene-templates"),
+  sceneFromTemplate: (payload: { name: string; namespace: string; slug: string; location: string; template: string; repeat_policy: string; priority: number; preview: boolean }) => request<{ id: string; requested_id: string; template: string; document: Record<string, unknown>; issues: Diagnostic[]; passed: boolean; conflict_resolved: boolean; scene?: SceneRecord }>("/api/content/scenes/from-template", { method: "POST", body: JSON.stringify(payload) }),
   createSession: () => request<{ session_id: string; state: Record<string, unknown>; traces: unknown[] }>("/api/runtime/sessions", { method: "POST" }),
   command: (sessionId: string, command: Record<string, unknown>) => request<{ status: string; trace: Record<string, unknown>; state: Record<string, unknown>; traces: unknown[] }>(`/api/runtime/sessions/${sessionId}/commands`, { method: "POST", body: JSON.stringify({ command }) }),
   candidates: (sessionId?: string) => request<Record<string, unknown>>("/api/diagnostics/scene-candidates", { method: "POST", body: JSON.stringify({ session_id: sessionId ?? null }) }),

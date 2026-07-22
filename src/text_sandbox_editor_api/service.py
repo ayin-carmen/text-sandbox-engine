@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import shutil
 import tempfile
 import uuid
@@ -126,6 +127,61 @@ class EditorService:
         path.parent.mkdir(parents=True, exist_ok=True)
         _atomic_json_write(path, document)
         return self.scene(scene_id)
+
+    def scene_templates(self) -> dict[str, Any]:
+        return {"templates": [dict(template) for template in _SCENE_TEMPLATES]}
+
+    def scene_from_template(
+        self,
+        *,
+        name: str,
+        namespace: str,
+        slug: str,
+        location: str,
+        template_id: str,
+        repeat_policy: str,
+        priority: int,
+        preview: bool = False,
+    ) -> dict[str, Any]:
+        self._require_workspace()
+        template = next((item for item in _SCENE_TEMPLATES if item["id"] == template_id), None)
+        if template is None:
+            raise ValueError(f"unknown scene template: {template_id}")
+        if not re.fullmatch(r"[a-z][a-z0-9_-]*", namespace):
+            raise ValueError("namespace must contain lowercase letters, digits, underscores, or hyphens")
+        if not re.fullmatch(r"[a-z][a-z0-9_-]*", slug):
+            raise ValueError("slug must start with a lowercase letter and contain only lowercase letters, digits, underscores, or hyphens")
+        if repeat_policy not in {"always", "once", "cooldown"}:
+            raise ValueError("repeat_policy must be always, once, or cooldown")
+        valid_locations = {item["id"] for item in self.references("location")["references"] if item["valid"]}
+        if location not in valid_locations:
+            raise ValueError(f"unknown location reference: {location}")
+        base_id = f"scene.{namespace}.{slug}"
+        scene_id = self._unique_scene_id(base_id)
+        document = deepcopy(template["document"])
+        document.update({
+            "id": scene_id,
+            "scope": {"location": location},
+            "priority": priority,
+            "repeat_policy": repeat_policy,
+        })
+        if name.strip():
+            document["text"] = f"{name.strip()}\n\n{document['text']}"
+        report = self.validate_document(document, None)
+        result = {
+            "id": scene_id,
+            "requested_id": base_id,
+            "template": template_id,
+            "document": document,
+            "issues": report["issues"],
+            "passed": report["passed"],
+            "conflict_resolved": scene_id != base_id,
+        }
+        if preview:
+            return result
+        if report["issues"]:
+            raise ValueError(json.dumps(report, ensure_ascii=False))
+        return {**result, "scene": self.create_scene(document)}
 
     def duplicate_scene(self, scene_id: str, new_scene_id: str, revision: str) -> dict[str, Any]:
         source = self.scene(scene_id)
@@ -413,6 +469,15 @@ class EditorService:
         assert self.content_root is not None
         return self.content_root / "scenes" / (scene_id.replace(".", "_") + ".json")
 
+    def _unique_scene_id(self, base_id: str) -> str:
+        existing = {item["id"] for item in self._scene_records()}
+        if base_id not in existing and not self._scene_path_for_id(base_id).exists():
+            return base_id
+        suffix = 2
+        while f"{base_id}_{suffix}" in existing or self._scene_path_for_id(f"{base_id}_{suffix}").exists():
+            suffix += 1
+        return f"{base_id}_{suffix}"
+
     def _registry(self) -> Registry:
         registry = Registry()
         register_builtins(registry)
@@ -494,6 +559,45 @@ def _scene_files(root: Path) -> list[Path]:
 
 
 _REFERENCE_TYPES = {"actor", "location", "item", "quest", "scene", "flag"}
+
+_SCENE_TEMPLATES = [
+    {
+        "id": "blank",
+        "label": "空白场景",
+        "description": "只包含一个继续选项的最小场景。",
+        "document": {"conditions": [], "text": "在这里写下场景正文。", "choices": [{"text": "继续", "effects": []}], "repeat_policy": "always"},
+    },
+    {
+        "id": "narrative",
+        "label": "普通叙事",
+        "description": "适合描述一段剧情并提供两个选择。",
+        "document": {"conditions": [], "text": "新的叙事片段从这里开始。", "choices": [{"text": "继续观察", "effects": []}, {"text": "暂时离开", "effects": []}], "repeat_policy": "always"},
+    },
+    {
+        "id": "npc_dialogue",
+        "label": "NPC 对话",
+        "description": "适合与当前地点的角色交谈。",
+        "document": {"conditions": [{"rule": "actor.is_present", "args": ["actor.player"]}], "text": "角色向你打招呼。", "choices": [{"text": "回应", "effects": []}, {"text": "告别", "effects": []}], "repeat_policy": "always"},
+    },
+    {
+        "id": "quest_offer",
+        "label": "接取任务",
+        "description": "提供接受任务的基础选项。",
+        "document": {"conditions": [], "text": "有人向你提出一项任务。", "choices": [{"text": "接受任务", "effects": [{"effect": "quest.set_stage", "args": ["quest.bread_delivery", "accepted"]}]}, {"text": "拒绝任务", "effects": []}], "repeat_policy": "once"},
+    },
+    {
+        "id": "item_delivery",
+        "label": "交付物品",
+        "description": "适合从玩家背包移除物品并完成交付。",
+        "document": {"conditions": [], "text": "你把准备好的物品交给对方。", "choices": [{"text": "完成交付", "effects": [{"effect": "inventory.remove_item", "args": ["actor.player", "item.bread_basket"]}]}, {"text": "稍后再来", "effects": []}], "repeat_policy": "once"},
+    },
+    {
+        "id": "arrival_event",
+        "label": "到达地点事件",
+        "description": "适合玩家到达地点后触发的事件。",
+        "document": {"conditions": [{"rule": "actor.is_present", "args": ["actor.player"]}], "text": "你抵达了这里，一件新鲜事正在发生。", "choices": [{"text": "介入事件", "effects": []}], "repeat_policy": "once"},
+    },
+]
 
 
 def _document_reference_values(document: dict[str, Any]) -> list[tuple[str, tuple[str, list[Any]]]]:

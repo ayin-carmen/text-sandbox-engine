@@ -3,19 +3,9 @@ import Editor from "@monaco-editor/react";
 import CytoscapeComponent from "react-cytoscapejs";
 import cytoscape from "cytoscape";
 import { ArrowDown, ArrowUp, Braces, CheckCircle2, CircleAlert, Copy, FileJson, FolderOpen, GitBranch, Play, RotateCcw, Save, Sparkles, Trash2 } from "lucide-react";
-import { api, Diagnostic, GraphData, ReferenceItem, RegistryItem, SceneRecord } from "./api";
+import { api, Diagnostic, GraphData, ReferenceItem, RegistryItem, SceneRecord, SceneTemplate } from "./api";
 
 type Tab = "form" | "json" | "graph" | "runtime" | "state";
-
-const blankScene = {
-  id: "scene.greybrook.new_scene",
-  scope: { location: "location.market_square" },
-  priority: 0,
-  conditions: [],
-  text: "在这里写下场景正文。",
-  choices: [{ text: "继续", effects: [] }],
-  repeat_policy: "always",
-};
 
 function App() {
   const [root, setRoot] = useState("examples/medieval_town");
@@ -31,6 +21,8 @@ function App() {
   const [graphRelationFilter, setGraphRelationFilter] = useState("all");
   const [registryItems, setRegistryItems] = useState<RegistryItem[]>([]);
   const [references, setReferences] = useState<ReferenceItem[]>([]);
+  const [sceneTemplates, setSceneTemplates] = useState<SceneTemplate[]>([]);
+  const [wizardOpen, setWizardOpen] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [state, setState] = useState<Record<string, unknown> | null>(null);
   const [stateDiff, setStateDiff] = useState<Record<string, unknown> | null>(null);
@@ -66,6 +58,7 @@ function App() {
       setGraph(await api.graph());
       setRegistryItems((await api.registry()).items);
       setReferences((await api.references()).references);
+      setSceneTemplates((await api.sceneTemplates()).templates);
       setState((await api.sourceState()).state);
       setMessage(`已打开 ${result.root}`);
       setIssues([]);
@@ -111,15 +104,19 @@ function App() {
 
   const create = async () => {
     if (!canDiscardDraft()) return;
+    setWizardOpen(true);
+  };
+
+  const createFromTemplate = async (payload: { name: string; namespace: string; slug: string; location: string; template: string; repeat_policy: string; priority: number }) => {
     try {
-      const next = await api.createScene(blankScene);
-      setScenes((items) => [...items, next]);
-      setSelected(next);
+      const result = await api.sceneFromTemplate({ ...payload, preview: false });
+      if (!result.scene) throw new Error("场景创建结果缺少记录");
+      setScenes((items) => [...items, result.scene!]);
+      setSelected(result.scene);
       setGraph(await api.graph());
-      setMessage("已创建新场景");
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "创建失败");
-    }
+      setWizardOpen(false);
+      setMessage(`已创建 ${result.id}`);
+    } catch (error) { setMessage(error instanceof Error ? error.message : "创建失败"); }
   };
 
   const duplicate = async () => {
@@ -268,8 +265,65 @@ function App() {
         <div className="panel-title">问题与 Trace</div>
         {issues.length ? issues.map((issue, index) => <div className="diagnostic" key={`${issue.code}-${index}`}><CircleAlert size={14} /><code>{issue.code}</code><span>{issue.message}</span><span className="muted">{issue.file ?? "当前文档"} {issue.json_path}</span></div>) : <div className="diagnostic-empty">暂无校验问题。运行预览结果会显示在“运行预览”视图中。</div>}
       </section>
+      <SceneWizard open={wizardOpen} templates={sceneTemplates} references={references} onClose={() => setWizardOpen(false)} onCreate={createFromTemplate} />
     </div>
   );
+}
+
+function SceneWizard({ open, templates, references, onClose, onCreate }: { open: boolean; templates: SceneTemplate[]; references: ReferenceItem[]; onClose: () => void; onCreate: (payload: { name: string; namespace: string; slug: string; location: string; template: string; repeat_policy: string; priority: number }) => Promise<void> }) {
+  const validLocations = references.filter((reference) => reference.type === "location" && reference.valid);
+  const [name, setName] = useState("新的场景");
+  const [namespace, setNamespace] = useState("greybrook");
+  const [slug, setSlug] = useState("new_scene");
+  const [location, setLocation] = useState("");
+  const [template, setTemplate] = useState("blank");
+  const [repeatPolicy, setRepeatPolicy] = useState("always");
+  const [priority, setPriority] = useState(0);
+  const [preview, setPreview] = useState<{ id: string; passed: boolean; issues: Diagnostic[]; conflict_resolved: boolean } | null>(null);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!open) return;
+    setName("新的场景");
+    setNamespace("greybrook");
+    setSlug("new_scene");
+    setLocation(validLocations[0]?.id ?? "");
+    setTemplate(templates[0]?.id ?? "blank");
+    setRepeatPolicy("always");
+    setPriority(0);
+    setPreview(null);
+    setError("");
+  }, [open]);
+
+  if (!open) return null;
+  const payload = { name, namespace, slug, location, template, repeat_policy: repeatPolicy, priority };
+  const previewTemplate = async () => {
+    try {
+      setError("");
+      const result = await api.sceneFromTemplate({ ...payload, preview: true });
+      setPreview(result);
+    } catch (cause) {
+      setPreview(null);
+      setError(cause instanceof Error ? cause.message : "模板预览失败");
+    }
+  };
+  const selectedTemplate = templates.find((item) => item.id === template);
+  return <div className="modal-backdrop" role="presentation" onMouseDown={onClose}><div className="wizard-dialog" role="dialog" aria-modal="true" aria-labelledby="scene-wizard-title" onMouseDown={(event) => event.stopPropagation()}>
+    <div className="wizard-header"><div><p className="eyebrow">SCENE WIZARD</p><h2 id="scene-wizard-title">新建场景</h2></div><button onClick={onClose} aria-label="关闭向导">×</button></div>
+    <div className="wizard-grid">
+      <label>场景名称<input value={name} onChange={(event) => { setName(event.target.value); setPreview(null); }} /></label>
+      <label>命名空间<input value={namespace} onChange={(event) => { setNamespace(event.target.value); setPreview(null); }} placeholder="greybrook" /></label>
+      <label>英文短标识<input value={slug} onChange={(event) => { setSlug(event.target.value); setPreview(null); }} placeholder="tavern_keeper_request" /></label>
+      <label>所属地点<select value={location} onChange={(event) => { setLocation(event.target.value); setPreview(null); }}>{validLocations.map((item) => <option key={item.id} value={item.id}>{item.label} · {item.id}</option>)}</select></label>
+      <label>场景模板<select value={template} onChange={(event) => { setTemplate(event.target.value); setPreview(null); }}>{templates.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select><small className="field-help">{selectedTemplate?.description ?? ""}</small></label>
+      <label>重复策略<select value={repeatPolicy} onChange={(event) => { setRepeatPolicy(event.target.value); setPreview(null); }}><option value="always">always：可重复</option><option value="once">once：只触发一次</option><option value="cooldown">cooldown：冷却后可重复</option></select></label>
+      <label>初始优先级<input type="number" value={priority} onChange={(event) => { setPriority(Number(event.target.value)); setPreview(null); }} /></label>
+    </div>
+    <div className="id-preview"><span>预览 ID</span><code>scene.{namespace || "namespace"}.{slug || "scene"}</code></div>
+    {error && <div className="wizard-error">{error}</div>}
+    {preview && <div className={`wizard-preview ${preview.passed ? "passed" : "failed"}`}><strong>{preview.passed ? "模板校验通过" : "模板校验失败"}</strong><span>将创建：{preview.id}{preview.conflict_resolved ? "（已避开重复 ID）" : ""}</span>{preview.issues.map((issue, index) => <span className="field-help" key={`${issue.code}-${index}`}>{issue.code}：{issue.message}</span>)}</div>}
+    <div className="wizard-actions"><button onClick={onClose}>取消</button><button onClick={previewTemplate}>预览并校验</button><button className="primary" disabled={!preview?.passed} onClick={() => onCreate(payload)}>确认创建</button></div>
+  </div></div>;
 }
 
 function SceneForm({ document, updateField, registryItems, references }: { document: Record<string, any>; updateField: (path: string, value: unknown) => void; registryItems: RegistryItem[]; references: ReferenceItem[] }) {

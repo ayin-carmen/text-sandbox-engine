@@ -20,6 +20,17 @@ class SceneDocument(BaseModel):
     revision: str | None = None
 
 
+class SceneTemplateRequest(BaseModel):
+    name: str = ""
+    namespace: str
+    slug: str
+    location: str
+    template_id: str = Field(alias="template")
+    repeat_policy: str = "always"
+    priority: int = 0
+    preview: bool = False
+
+
 class SceneName(BaseModel):
     new_scene_id: str
     revision: str
@@ -86,6 +97,26 @@ def create_app(service: EditorService | None = None) -> FastAPI:
     def create_scene(payload: SceneDocument):
         try:
             return editor.create_scene(payload.document)
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from exc
+
+    @app.get("/api/metadata/scene-templates")
+    def scene_templates():
+        return editor.scene_templates()
+
+    @app.post("/api/content/scenes/from-template")
+    def scene_from_template(payload: SceneTemplateRequest):
+        try:
+            return editor.scene_from_template(
+                name=payload.name,
+                namespace=payload.namespace,
+                slug=payload.slug,
+                location=payload.location,
+                template_id=payload.template_id,
+                repeat_policy=payload.repeat_policy,
+                priority=payload.priority,
+                preview=payload.preview,
+            )
         except ValueError as exc:
             raise HTTPException(422, str(exc)) from exc
 
