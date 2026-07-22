@@ -2,6 +2,16 @@
 
 本文件按每次更新独立记录，不把后续提交合并进已有条目。
 
+## 2026-07-22 - 补充 Tauri 应用图标
+
+### 新增
+
+- 新增 `src-tauri/icons/icon.ico` 和 `scripts/create_tauri_icon.py`，补齐 Windows Tauri 资源编译所需的应用图标。
+
+### 验证
+
+- 重新触发 GitHub Actions Windows 桌面构建，继续验证 NSIS 安装包生成。
+
 ## 2026-07-22 - 修复 Windows Tauri 构建工作流
 
 ### 修复
