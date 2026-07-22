@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import Editor from "@monaco-editor/react";
 import CytoscapeComponent from "react-cytoscapejs";
 import cytoscape from "cytoscape";
-import { Braces, CheckCircle2, CircleAlert, FileJson, FolderOpen, GitBranch, Play, Save, Sparkles } from "lucide-react";
+import { ArrowDown, ArrowUp, Braces, CheckCircle2, CircleAlert, Copy, FileJson, FolderOpen, GitBranch, Play, RotateCcw, Save, Sparkles, Trash2 } from "lucide-react";
 import { api, Diagnostic, GraphData, ReferenceItem, RegistryItem, SceneRecord } from "./api";
 
 type Tab = "form" | "json" | "graph" | "runtime" | "state";
@@ -39,8 +39,24 @@ function App() {
   const [changedByMatches, setChangedByMatches] = useState<Record<string, unknown>[]>([]);
   const [changedByPath, setChangedByPath] = useState("entities.actor.player.components.location.current");
   const [commandText, setCommandText] = useState(JSON.stringify({ type: "space.travel_to", actor: "actor.player", target: "location.market_square", args: {} }, null, 2));
+  const isDirty = Boolean(selected && rawJson !== JSON.stringify(selected.document, null, 2));
+
+  useEffect(() => {
+    if (!isDirty) return;
+    const warnBeforeUnload = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ""; };
+    window.addEventListener("beforeunload", warnBeforeUnload);
+    return () => window.removeEventListener("beforeunload", warnBeforeUnload);
+  }, [isDirty]);
+
+  const canDiscardDraft = () => !isDirty || window.confirm("当前场景有未保存修改，确定放弃并切换吗？");
+  const selectScene = (scene: SceneRecord) => {
+    if (!canDiscardDraft()) return;
+    setSelected(scene);
+    setTab("form");
+  };
 
   const openWorkspace = async () => {
+    if (!canDiscardDraft()) return;
     try {
       const result = await api.open(root);
       const sceneResult = await api.scenes();
@@ -87,7 +103,14 @@ function App() {
     }
   };
 
+  const discardDraft = () => {
+    if (!selected || !window.confirm("确定放弃当前场景的未保存修改吗？")) return;
+    setRawJson(JSON.stringify(selected.document, null, 2));
+    setMessage("已放弃未保存修改");
+  };
+
   const create = async () => {
+    if (!canDiscardDraft()) return;
     try {
       const next = await api.createScene(blankScene);
       setScenes((items) => [...items, next]);
@@ -101,6 +124,7 @@ function App() {
 
   const duplicate = async () => {
     if (!selected) return;
+    if (!canDiscardDraft()) return;
     const newId = window.prompt("新场景 ID", `${selected.id}_copy`);
     if (!newId) return;
     try {
@@ -114,6 +138,7 @@ function App() {
 
   const rename = async () => {
     if (!selected) return;
+    if (!canDiscardDraft()) return;
     const newId = window.prompt("新的场景 ID", selected.id);
     if (!newId || newId === selected.id) return;
     try {
@@ -127,6 +152,7 @@ function App() {
 
   const remove = async () => {
     if (!selected || !window.confirm(`确认删除 ${selected.id}？`)) return;
+    if (!canDiscardDraft()) return;
     try {
       await api.deleteScene(selected.id, selected.revision);
       const nextScenes = scenes.filter((item) => item.id !== selected.id);
@@ -195,7 +221,7 @@ function App() {
         </div>
         <div className="top-actions">
           <button onClick={validate}><CheckCircle2 size={16} />校验</button>
-          <button className="primary" onClick={save} disabled={!selected}><Save size={16} />保存</button>
+          <button onClick={discardDraft} disabled={!isDirty}><RotateCcw size={16} />撤销草稿</button><button className="primary" onClick={save} disabled={!selected || !isDirty}><Save size={16} />保存</button>
         </div>
       </header>
       <div className="statusbar"><span className={issues.length ? "status-error" : "status-ok"}>{issues.length ? <CircleAlert size={14} /> : <CheckCircle2 size={14} />}{message}</span>{workspace && <span>{workspace.scene_count} 个场景 · {workspace.state_path}</span>}</div>
@@ -204,7 +230,7 @@ function App() {
           <div className="panel-title">内容树</div>
           <div className="tree-group"><FolderOpen size={14} /> {workspace?.root ?? "未打开工作区"}</div>
           <div className="tree-label">scenes</div>
-          {scenes.map((scene) => <button key={scene.id} className={`tree-item ${selected?.id === scene.id ? "selected" : ""}`} onClick={() => { setSelected(scene); setTab("form"); }}><FileJson size={14} />{scene.id}</button>)}
+          {scenes.map((scene) => <button key={scene.id} className={`tree-item ${selected?.id === scene.id ? "selected" : ""}`} onClick={() => selectScene(scene)}><FileJson size={14} />{scene.id}</button>)}
           <div className="tree-label">运行文件</div>
           <div className="tree-file"><FileJson size={14} /> world_state.json</div>
           <div className="tree-file"><FileJson size={14} /> commands/vertical_slice.json</div>
@@ -233,6 +259,7 @@ function App() {
             <div className="inspector-section"><label>修订标识</label><code>{selected.revision.slice(0, 12)}…</code></div>
             <div className="inspector-section"><label>JSON 路径</label><code>$.choices[0].effects</code></div>
             <div className="inspector-section"><label>关系</label><span>{graph?.edges.filter((edge) => edge.source === selected.id).length ?? 0} 条引用</span></div>
+            {isDirty && <div className="draft-status">有未保存修改</div>}
             <div className="inspector-actions"><button onClick={duplicate}>复制</button><button onClick={rename}>重命名</button><button onClick={remove}>删除</button></div>
           </> : <span className="muted">选择一个场景</span>}
         </aside>
@@ -266,6 +293,16 @@ function SceneForm({ document, updateField, registryItems, references }: { docum
     const choiceEffects = Array.isArray(choice.effects) ? choice.effects : [];
     updateChoice(choiceIndex, { ...choice, effects: choiceEffects.map((item: any, index: number) => index === effectIndex ? { ...item, effect: typeId, args: defaultArgs(findEffect(typeId)) } : item) });
   };
+  const shift = <T,>(items: T[], index: number, delta: number) => {
+    const target = index + delta;
+    if (target < 0 || target >= items.length) return items;
+    const next = [...items];
+    [next[index], next[target]] = [next[target], next[index]];
+    return next;
+  };
+  const updateConditions = (next: unknown[]) => updateField("conditions", next);
+  const updateChoiceList = (next: unknown[]) => updateField("choices", next);
+  const removeChoice = (index: number) => { if (choices.length > 1) updateChoiceList(choices.filter((_, itemIndex) => itemIndex !== index)); };
   return <div className="form-view">
     <div className="form-header"><div><p className="eyebrow">SCENE</p><h1>{document.id ?? "未命名场景"}</h1></div><span className="badge">{document.repeat_policy ?? "always"}</span></div>
     <div className="form-grid">
@@ -277,24 +314,25 @@ function SceneForm({ document, updateField, registryItems, references }: { docum
     <label className="wide-field">场景正文<textarea rows={6} value={document.text ?? ""} onChange={(event) => updateField("text", event.target.value)} /></label>
     <div className="subsection"><div className="subsection-title">条件规则 <span>{conditions.length}</span></div>
       {conditions.map((condition: any, index: number) => <div className="rule-row" key={index}>
-        <div className="rule-selector"><select value={condition.rule ?? ""} onChange={(event) => replaceConditionType(index, event.target.value)}>{condition.rule && !findRule(condition.rule) && <option value={condition.rule}>{condition.rule}（未知）</option>}{rules.map((rule) => <option key={rule.type_id} value={rule.type_id}>{rule.label} · {rule.type_id}</option>)}</select><span className="field-help">{findRule(condition.rule)?.description ?? "请在 JSON 高级模式中检查该规则。"}</span></div>
+        <div className="rule-selector"><select value={condition.rule ?? ""} onChange={(event) => replaceConditionType(index, event.target.value)}>{condition.rule && !findRule(condition.rule) && <option value={condition.rule}>{condition.rule}（未知）</option>}{rules.map((rule) => <option key={rule.type_id} value={rule.type_id}>{rule.label} · {rule.type_id}</option>)}</select><span className="field-help">{findRule(condition.rule)?.description ?? "请在 JSON 高级模式中检查该规则。"}</span><div className="row-actions"><button title="复制条件" aria-label="复制条件" onClick={() => updateConditions([...conditions.slice(0, index + 1), structuredClone(condition), ...conditions.slice(index + 1)])}><Copy size={13} /></button><button title="上移条件" aria-label="上移条件" disabled={index === 0} onClick={() => updateConditions(shift(conditions, index, -1))}><ArrowUp size={13} /></button><button title="下移条件" aria-label="下移条件" disabled={index === conditions.length - 1} onClick={() => updateConditions(shift(conditions, index, 1))}><ArrowDown size={13} /></button><button title="删除条件" aria-label="删除条件" onClick={() => updateConditions(conditions.filter((_, itemIndex) => itemIndex !== index))}><Trash2 size={13} /></button></div></div>
         <ArgumentFields item={findRule(condition.rule)} args={condition.args ?? []} references={references} onChange={(args) => updateCondition(index, { ...condition, args })} />
       </div>)}
       <button onClick={() => updateField("conditions", [...conditions, { rule: rules[0]?.type_id ?? "flag.is_false", args: defaultArgs(rules[0]) }])}>+ 添加规则</button>
     </div>
     <div className="subsection"><div className="subsection-title">选项与效果 <span>{choices.length}</span></div>
       {choices.map((choice: any, choiceIndex: number) => <div className="choice-editor" key={choiceIndex}>
+        <div className="choice-heading"><strong>选项 {choiceIndex + 1}</strong><div className="row-actions"><button title="复制选项" aria-label="复制选项" onClick={() => updateChoiceList([...choices.slice(0, choiceIndex + 1), structuredClone(choice), ...choices.slice(choiceIndex + 1)])}><Copy size={13} /></button><button title="上移选项" aria-label="上移选项" disabled={choiceIndex === 0} onClick={() => updateChoiceList(shift(choices, choiceIndex, -1))}><ArrowUp size={13} /></button><button title="下移选项" aria-label="下移选项" disabled={choiceIndex === choices.length - 1} onClick={() => updateChoiceList(shift(choices, choiceIndex, 1))}><ArrowDown size={13} /></button><button title="删除选项" aria-label="删除选项" disabled={choices.length <= 1} onClick={() => removeChoice(choiceIndex)}><Trash2 size={13} /></button></div></div>
         <label>选项文本<input value={choice.text ?? ""} onChange={(event) => updateChoice(choiceIndex, { ...choice, text: event.target.value })} /></label>
         <div className="choice-conditions"><div className="subsection-title">显示条件 <span>{choice.visible_if?.length ?? 0}</span></div>
           {(choice.visible_if ?? []).map((condition: any, conditionIndex: number) => <div className="rule-row" key={conditionIndex}>
-            <div className="rule-selector"><select value={condition.rule ?? ""} onChange={(event) => replaceVisibleConditionType(choiceIndex, conditionIndex, event.target.value)}>{condition.rule && !findRule(condition.rule) && <option value={condition.rule}>{condition.rule}（未知）</option>}{rules.map((rule) => <option key={rule.type_id} value={rule.type_id}>{rule.label} · {rule.type_id}</option>)}</select><span className="field-help">{findRule(condition.rule)?.description ?? "请在 JSON 高级模式中检查该规则。"}</span></div>
+            <div className="rule-selector"><select value={condition.rule ?? ""} onChange={(event) => replaceVisibleConditionType(choiceIndex, conditionIndex, event.target.value)}>{condition.rule && !findRule(condition.rule) && <option value={condition.rule}>{condition.rule}（未知）</option>}{rules.map((rule) => <option key={rule.type_id} value={rule.type_id}>{rule.label} · {rule.type_id}</option>)}</select><span className="field-help">{findRule(condition.rule)?.description ?? "请在 JSON 高级模式中检查该规则。"}</span><div className="row-actions"><button title="复制显示条件" aria-label="复制显示条件" onClick={() => { const visibleIf = [...choice.visible_if.slice(0, conditionIndex + 1), structuredClone(condition), ...choice.visible_if.slice(conditionIndex + 1)]; updateChoice(choiceIndex, { ...choice, visible_if: visibleIf }); }}><Copy size={13} /></button><button title="上移显示条件" aria-label="上移显示条件" disabled={conditionIndex === 0} onClick={() => updateChoice(choiceIndex, { ...choice, visible_if: shift(choice.visible_if, conditionIndex, -1) })}><ArrowUp size={13} /></button><button title="下移显示条件" aria-label="下移显示条件" disabled={conditionIndex === choice.visible_if.length - 1} onClick={() => updateChoice(choiceIndex, { ...choice, visible_if: shift(choice.visible_if, conditionIndex, 1) })}><ArrowDown size={13} /></button><button title="删除显示条件" aria-label="删除显示条件" onClick={() => updateChoice(choiceIndex, { ...choice, visible_if: choice.visible_if.filter((_: unknown, itemIndex: number) => itemIndex !== conditionIndex) })}><Trash2 size={13} /></button></div></div>
             <ArgumentFields item={findRule(condition.rule)} args={condition.args ?? []} references={references} onChange={(args) => { const visibleIf = [...choice.visible_if]; visibleIf[conditionIndex] = { ...condition, args }; updateChoice(choiceIndex, { ...choice, visible_if: visibleIf }); }} />
           </div>)}
           <button onClick={() => updateChoice(choiceIndex, { ...choice, visible_if: [...(choice.visible_if ?? []), { rule: rules[0]?.type_id ?? "flag.is_false", args: defaultArgs(rules[0]) }] })}>+ 添加显示条件</button>
         </div>
         <div className="choice-effects"><div className="subsection-title">执行效果 <span>{choice.effects?.length ?? 0}</span></div>
           {(choice.effects ?? []).map((effect: any, effectIndex: number) => <div className="rule-row" key={effectIndex}>
-            <div className="rule-selector"><select value={effect.effect ?? ""} onChange={(event) => replaceEffectType(choiceIndex, effectIndex, event.target.value)}>{effect.effect && !findEffect(effect.effect) && <option value={effect.effect}>{effect.effect}（未知）</option>}{effects.map((item) => <option key={item.type_id} value={item.type_id}>{item.label} · {item.type_id}</option>)}</select><span className="field-help">{findEffect(effect.effect)?.description ?? "请在 JSON 高级模式中检查该效果。"}</span></div>
+            <div className="rule-selector"><select value={effect.effect ?? ""} onChange={(event) => replaceEffectType(choiceIndex, effectIndex, event.target.value)}>{effect.effect && !findEffect(effect.effect) && <option value={effect.effect}>{effect.effect}（未知）</option>}{effects.map((item) => <option key={item.type_id} value={item.type_id}>{item.label} · {item.type_id}</option>)}</select><span className="field-help">{findEffect(effect.effect)?.description ?? "请在 JSON 高级模式中检查该效果。"}</span><div className="row-actions"><button title="复制效果" aria-label="复制效果" onClick={() => { const next = [...choice.effects.slice(0, effectIndex + 1), structuredClone(effect), ...choice.effects.slice(effectIndex + 1)]; updateChoice(choiceIndex, { ...choice, effects: next }); }}><Copy size={13} /></button><button title="上移效果" aria-label="上移效果" disabled={effectIndex === 0} onClick={() => updateChoice(choiceIndex, { ...choice, effects: shift(choice.effects, effectIndex, -1) })}><ArrowUp size={13} /></button><button title="下移效果" aria-label="下移效果" disabled={effectIndex === choice.effects.length - 1} onClick={() => updateChoice(choiceIndex, { ...choice, effects: shift(choice.effects, effectIndex, 1) })}><ArrowDown size={13} /></button><button title="删除效果" aria-label="删除效果" onClick={() => updateChoice(choiceIndex, { ...choice, effects: choice.effects.filter((_: unknown, itemIndex: number) => itemIndex !== effectIndex) })}><Trash2 size={13} /></button></div></div>
             <ArgumentFields item={findEffect(effect.effect)} args={effect.args ?? []} references={references} onChange={(args) => { const next = [...choice.effects]; next[effectIndex] = { ...effect, args }; updateChoice(choiceIndex, { ...choice, effects: next }); }} />
           </div>)}
           <p className="field-help">效果按照从上到下的顺序执行。</p>
