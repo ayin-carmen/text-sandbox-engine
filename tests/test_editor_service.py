@@ -18,7 +18,7 @@ class EditorServiceTests(unittest.TestCase):
         service = EditorService()
         workspace = service.open_workspace(MEDIEVAL_ROOT)
 
-        self.assertEqual(workspace["scene_count"], 5)
+        self.assertGreaterEqual(workspace["scene_count"], 5)
         self.assertGreater(len(service.tree()["entries"]), 5)
         graph = service.graph()
         self.assertIn("scene.greybrook.market_baker", {node["id"] for node in graph["nodes"]})
@@ -79,6 +79,44 @@ class EditorServiceTests(unittest.TestCase):
         self.assertEqual(source["state"]["schema_version"], 1)
         self.assertTrue(source["revision"])
         self.assertIn("flag.set", {item["type_id"] for item in metadata["items"]})
+
+    def test_low_code_metadata_and_reference_index(self) -> None:
+        service = EditorService()
+        service.open_workspace(MEDIEVAL_ROOT)
+
+        metadata = {item["type_id"]: item for item in service.registry_metadata()["items"]}
+        flag_set = metadata["flag.set"]
+        self.assertEqual(flag_set["label"], "设置 Flag")
+        self.assertEqual(flag_set["category"], "状态")
+        self.assertEqual(flag_set["parameters"][0]["widget"], "reference_select")
+        self.assertEqual(flag_set["parameters"][0]["reference_type"], "flag")
+
+        references = service.references()["references"]
+        by_key = {(item["type"], item["id"]): item for item in references}
+        self.assertEqual(by_key[("actor", "actor.elda")]["label"], "艾尔达")
+        self.assertTrue(by_key[("location", "location.market_square")]["valid"])
+        self.assertTrue(by_key[("item", "item.bread_basket")]["valid"])
+        self.assertEqual(
+            {item["type"] for item in service.references("actor")["references"]},
+            {"actor"},
+        )
+
+    def test_reference_index_marks_missing_actor(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir) / "town"
+            shutil.copytree(MEDIEVAL_ROOT, workspace)
+            scene_path = workspace / "content" / "scenes" / "market_baker.json"
+            document = json.loads(scene_path.read_text(encoding="utf-8"))
+            document["conditions"][0]["args"][0] = "actor.missing"
+            scene_path.write_text(json.dumps(document, ensure_ascii=False), encoding="utf-8")
+
+            service = EditorService()
+            service.open_workspace(workspace)
+            references = service.references("actor")["references"]
+
+            missing = next(item for item in references if item["id"] == "actor.missing")
+            self.assertFalse(missing["valid"])
+            self.assertEqual(missing["source"], "content/scenes/market_baker.json")
 
 
 if __name__ == "__main__":

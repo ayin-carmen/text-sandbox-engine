@@ -221,6 +221,89 @@ class EditorService:
     def registry_metadata(self) -> dict[str, Any]:
         return {"items": self._registry().metadata()}
 
+    def references(self, reference_type: str | None = None) -> dict[str, Any]:
+        """Build low-code reference choices from the open workspace."""
+        self._require_workspace()
+        assert self.state_path is not None
+        state = load_world_state(self.state_path)
+        records = self._scene_records()
+        source_path = self._source_label(self.state_path)
+        known: dict[str, set[str]] = {kind: set() for kind in _REFERENCE_TYPES}
+        entries: dict[tuple[str, str], dict[str, Any]] = {}
+
+        def add(kind: str, ref_id: str, label: str, source: str, valid: bool = True) -> None:
+            if kind not in _REFERENCE_TYPES or not isinstance(ref_id, str) or not ref_id:
+                return
+            if reference_type and kind != reference_type:
+                return
+            key = (kind, ref_id)
+            current = entries.get(key)
+            candidate = {
+                "id": ref_id,
+                "type": kind,
+                "label": label or ref_id,
+                "source": source,
+                "valid": valid,
+            }
+            if current is None or (not current["valid"] and valid):
+                entries[key] = candidate
+
+        for entity_id, entity in state.get("entities", {}).items():
+            if not isinstance(entity, dict):
+                continue
+            kind = entity.get("type")
+            if kind not in {"actor", "location", "item", "quest"}:
+                continue
+            known[kind].add(entity_id)
+            components = entity.get("components", {})
+            profile = components.get("profile", {}) if isinstance(components, dict) else {}
+            description = components.get("description", {}) if isinstance(components, dict) else {}
+            label = profile.get("name") or description.get("name") or entity_id
+            add(kind, entity_id, str(label), source_path)
+
+        quests = state.get("globals", {}).get("quests", {})
+        if isinstance(quests, dict):
+            for quest_id, quest in quests.items():
+                known["quest"].add(quest_id)
+                label = quest.get("name") if isinstance(quest, dict) else None
+                add("quest", quest_id, str(label or quest_id), source_path)
+
+        flags = state.get("flags", {})
+        if isinstance(flags, dict):
+            for flag_id in flags:
+                known["flag"].add(flag_id)
+                add("flag", flag_id, flag_id, source_path)
+
+        for record in records:
+            scene_id = record["id"]
+            known["scene"].add(scene_id)
+            add("scene", scene_id, str(record["document"].get("title") or scene_id), self._source_label(Path(record["path"])))
+
+        metadata = {(item["kind"], item["type_id"]): item for item in self._registry().metadata()}
+        for record in records:
+            document = record["document"]
+            source = self._source_label(Path(record["path"]))
+            location = document.get("scope", {}).get("location")
+            if isinstance(location, str):
+                add("location", location, location, source, location in known["location"])
+            for kind, references in _document_reference_values(document):
+                item = metadata.get((kind, references[0]))
+                if item is None:
+                    continue
+                args = references[1]
+                for index, parameter in enumerate(item.get("parameters", [])):
+                    target_type = parameter.get("reference_type")
+                    if target_type and index < len(args) and isinstance(args[index], str):
+                        ref_id = args[index]
+                        valid = ref_id in known[target_type]
+                        if target_type == "item" and not valid:
+                            # Item definitions are not separate documents yet; existing content refs form the first index.
+                            known[target_type].add(ref_id)
+                            valid = True
+                        add(target_type, ref_id, ref_id, source, valid)
+
+        return {"references": sorted(entries.values(), key=lambda item: (item["type"], item["label"], item["id"]))}
+
     def schemas(self) -> dict[str, Any]:
         self._require_workspace()
         assert self.workspace_root is not None
@@ -344,6 +427,13 @@ class EditorService:
         if self.workspace_root is None or self.content_root is None or self.state_path is None:
             raise ValueError("no workspace is open")
 
+    def _source_label(self, path: Path) -> str:
+        assert self.workspace_root is not None
+        try:
+            return path.relative_to(self.workspace_root).as_posix()
+        except ValueError:
+            return str(path)
+
     def _schema_root(self) -> Path | None:
         assert self.workspace_root is not None
         candidates = [
@@ -401,6 +491,26 @@ class EditorService:
 def _scene_files(root: Path) -> list[Path]:
     scene_root = root / "scenes"
     return sorted((scene_root if scene_root.exists() else root).rglob("*.json"))
+
+
+_REFERENCE_TYPES = {"actor", "location", "item", "quest", "scene", "flag"}
+
+
+def _document_reference_values(document: dict[str, Any]) -> list[tuple[str, tuple[str, list[Any]]]]:
+    values: list[tuple[str, tuple[str, list[Any]]]] = []
+    for rule in document.get("conditions", []):
+        if isinstance(rule, dict) and isinstance(rule.get("args"), list):
+            values.append(("rule", (str(rule.get("rule", "")), rule["args"])))
+    for choice in document.get("choices", []):
+        if not isinstance(choice, dict):
+            continue
+        for rule in choice.get("visible_if", []):
+            if isinstance(rule, dict) and isinstance(rule.get("args"), list):
+                values.append(("rule", (str(rule.get("rule", "")), rule["args"])))
+        for effect in choice.get("effects", []):
+            if isinstance(effect, dict) and isinstance(effect.get("args"), list):
+                values.append(("effect", (str(effect.get("effect", "")), effect["args"])))
+    return values
 
 
 def _load_json(path: Path) -> dict[str, Any]:

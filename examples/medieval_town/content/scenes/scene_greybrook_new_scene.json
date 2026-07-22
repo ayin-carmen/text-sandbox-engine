@@ -1,0 +1,16 @@
+{
+  "id": "scene.greybrook.new_scene",
+  "scope": {
+    "location": "location.market_square"
+  },
+  "priority": 0,
+  "conditions": [],
+  "text": "在这里写下场景正文。",
+  "choices": [
+    {
+      "text": "继续",
+      "effects": []
+    }
+  ],
+  "repeat_policy": "always"
+}

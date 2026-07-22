@@ -22,8 +22,32 @@ export type GraphData = {
 export type RegistryItem = {
   kind: "command" | "rule" | "effect";
   type_id: string;
+  label: string;
+  category: string;
   description: string;
-  parameters: Array<{ name: string; data_type: string; required: boolean; default: unknown }>;
+  module: string;
+  module_version: string;
+  reads?: string[];
+  writes?: string[];
+  parameters: Array<{
+    name: string;
+    label: string;
+    data_type: string;
+    widget: "boolean" | "integer" | "number" | "text" | "reference_select" | string;
+    reference_type?: "actor" | "location" | "item" | "quest" | "scene" | "flag";
+    required: boolean;
+    default: unknown;
+    description: string;
+    enum?: string[];
+  }>;
+};
+
+export type ReferenceItem = {
+  id: string;
+  type: "actor" | "location" | "item" | "quest" | "scene" | "flag";
+  label: string;
+  source: string;
+  valid: boolean;
 };
 
 const base = import.meta.env.DEV ? "" : "http://127.0.0.1:8765";
@@ -53,6 +77,7 @@ export const api = {
   validate: () => request<{ passed: boolean; issues: Diagnostic[]; scene_count: number }>("/api/validation/content", { method: "POST" }),
   graph: () => request<GraphData>("/api/graph/content"),
   registry: () => request<{ items: RegistryItem[] }>("/api/metadata/registry"),
+  references: (type?: ReferenceItem["type"]) => request<{ references: ReferenceItem[] }>(`/api/metadata/references${type ? `?type=${encodeURIComponent(type)}` : ""}`),
   createSession: () => request<{ session_id: string; state: Record<string, unknown>; traces: unknown[] }>("/api/runtime/sessions", { method: "POST" }),
   command: (sessionId: string, command: Record<string, unknown>) => request<{ status: string; trace: Record<string, unknown>; state: Record<string, unknown>; traces: unknown[] }>(`/api/runtime/sessions/${sessionId}/commands`, { method: "POST", body: JSON.stringify({ command }) }),
   candidates: (sessionId?: string) => request<Record<string, unknown>>("/api/diagnostics/scene-candidates", { method: "POST", body: JSON.stringify({ session_id: sessionId ?? null }) }),

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
@@ -128,6 +128,10 @@ def create_app(service: EditorService | None = None) -> FastAPI:
     @app.get("/api/metadata/registry")
     def registry_metadata():
         return editor.registry_metadata()
+
+    @app.get("/api/metadata/references")
+    def references(reference_type: str | None = Query(default=None, alias="type")):
+        return editor.references(reference_type)
 
     @app.get("/api/metadata/schemas")
     def schemas():

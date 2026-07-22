@@ -3,7 +3,7 @@ import Editor from "@monaco-editor/react";
 import CytoscapeComponent from "react-cytoscapejs";
 import cytoscape from "cytoscape";
 import { Braces, CheckCircle2, CircleAlert, FileJson, FolderOpen, GitBranch, Play, Save, Sparkles } from "lucide-react";
-import { api, Diagnostic, GraphData, RegistryItem, SceneRecord } from "./api";
+import { api, Diagnostic, GraphData, ReferenceItem, RegistryItem, SceneRecord } from "./api";
 
 type Tab = "form" | "json" | "graph" | "runtime" | "state";
 
@@ -30,6 +30,7 @@ function App() {
   const [graphTypeFilter, setGraphTypeFilter] = useState("all");
   const [graphRelationFilter, setGraphRelationFilter] = useState("all");
   const [registryItems, setRegistryItems] = useState<RegistryItem[]>([]);
+  const [references, setReferences] = useState<ReferenceItem[]>([]);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [state, setState] = useState<Record<string, unknown> | null>(null);
   const [stateDiff, setStateDiff] = useState<Record<string, unknown> | null>(null);
@@ -48,6 +49,7 @@ function App() {
       setSelected(sceneResult.scenes[0] ?? null);
       setGraph(await api.graph());
       setRegistryItems((await api.registry()).items);
+      setReferences((await api.references()).references);
       setState((await api.sourceState()).state);
       setMessage(`已打开 ${result.root}`);
       setIssues([]);
@@ -217,7 +219,7 @@ function App() {
             <button className={tab === "state" ? "active" : ""} onClick={() => setTab("state")}>World State</button>
           </nav>
           {!selected && <div className="empty">打开一个真实内容包开始编辑。</div>}
-          {selected && tab === "form" && <SceneForm document={formDocument} updateField={updateField} registryItems={registryItems} />}
+          {selected && tab === "form" && <SceneForm document={formDocument} updateField={updateField} registryItems={registryItems} references={references} />}
           {selected && tab === "json" && <div className="monaco-wrap"><Editor height="560px" language="json" theme="vs-dark" value={rawJson} onChange={(value) => setRawJson(value ?? "")} options={{ minimap: { enabled: false }, fontSize: 13, wordWrap: "on" }} /></div>}
           {tab === "graph" && <div className="graph-view"><div className="viz-controls"><label>节点类型<select value={graphTypeFilter} onChange={(event) => setGraphTypeFilter(event.target.value)}><option value="all">全部</option>{graphNodeTypes.map((type) => <option key={type} value={type}>{type}</option>)}</select></label><label>引用关系<select value={graphRelationFilter} onChange={(event) => setGraphRelationFilter(event.target.value)}><option value="all">全部</option>{graphRelations.map((relation) => <option key={relation} value={relation}>{relation}</option>)}</select></label></div><div className="graph-wrap"><CytoscapeComponent elements={graphElements} stylesheet={graphStyle} layout={{ name: "cose", animate: false }} style={{ width: "100%", height: "620px" }} cy={(instance: any) => instance.on("tap", "node", (event: any) => setMessage(`节点：${event.target.data("label")} · 类型：${event.target.data("type")}`))} /></div></div>}
           {tab === "runtime" && <RuntimePanel commandText={commandText} setCommandText={setCommandText} runCommand={runCommand} trace={trace} candidates={candidates} stateDiff={stateDiff} changedByPath={changedByPath} setChangedByPath={setChangedByPath} inspectChangedBy={inspectChangedBy} changedByMatches={changedByMatches} />}
@@ -243,14 +245,27 @@ function App() {
   );
 }
 
-function SceneForm({ document, updateField, registryItems }: { document: Record<string, any>; updateField: (path: string, value: unknown) => void; registryItems: RegistryItem[] }) {
+function SceneForm({ document, updateField, registryItems, references }: { document: Record<string, any>; updateField: (path: string, value: unknown) => void; registryItems: RegistryItem[]; references: ReferenceItem[] }) {
   const rules = registryItems.filter((item) => item.kind === "rule");
   const effects = registryItems.filter((item) => item.kind === "effect");
   const conditions = Array.isArray(document.conditions) ? document.conditions : [];
   const choices = Array.isArray(document.choices) ? document.choices : [];
   const updateCondition = (index: number, value: Record<string, unknown>) => updateField("conditions", conditions.map((item, itemIndex) => itemIndex === index ? value : item));
   const updateChoice = (index: number, value: Record<string, unknown>) => updateField("choices", choices.map((item, itemIndex) => itemIndex === index ? value : item));
-  const parseArgs = (value: string) => { try { return JSON.parse(value); } catch { return []; } };
+  const defaultArgs = (item: RegistryItem | undefined) => item?.parameters.map((parameter) => parameter.default ?? "") ?? [];
+  const findRule = (typeId: string) => rules.find((item) => item.type_id === typeId);
+  const findEffect = (typeId: string) => effects.find((item) => item.type_id === typeId);
+  const replaceConditionType = (index: number, typeId: string) => updateCondition(index, { ...conditions[index], rule: typeId, args: defaultArgs(findRule(typeId)) });
+  const replaceVisibleConditionType = (choiceIndex: number, conditionIndex: number, typeId: string) => {
+    const choice = choices[choiceIndex];
+    const visibleIf = Array.isArray(choice.visible_if) ? choice.visible_if : [];
+    updateChoice(choiceIndex, { ...choice, visible_if: visibleIf.map((item: any, index: number) => index === conditionIndex ? { ...item, rule: typeId, args: defaultArgs(findRule(typeId)) } : item) });
+  };
+  const replaceEffectType = (choiceIndex: number, effectIndex: number, typeId: string) => {
+    const choice = choices[choiceIndex];
+    const choiceEffects = Array.isArray(choice.effects) ? choice.effects : [];
+    updateChoice(choiceIndex, { ...choice, effects: choiceEffects.map((item: any, index: number) => index === effectIndex ? { ...item, effect: typeId, args: defaultArgs(findEffect(typeId)) } : item) });
+  };
   return <div className="form-view">
     <div className="form-header"><div><p className="eyebrow">SCENE</p><h1>{document.id ?? "未命名场景"}</h1></div><span className="badge">{document.repeat_policy ?? "always"}</span></div>
     <div className="form-grid">
@@ -261,14 +276,53 @@ function SceneForm({ document, updateField, registryItems }: { document: Record<
     </div>
     <label className="wide-field">场景正文<textarea rows={6} value={document.text ?? ""} onChange={(event) => updateField("text", event.target.value)} /></label>
     <div className="subsection"><div className="subsection-title">条件规则 <span>{conditions.length}</span></div>
-      {conditions.map((condition: any, index: number) => <div className="rule-row" key={index}><select value={condition.rule ?? ""} onChange={(event) => updateCondition(index, { ...condition, rule: event.target.value })}>{rules.map((rule) => <option key={rule.type_id} value={rule.type_id}>{rule.type_id}</option>)}</select><input value={JSON.stringify(condition.args ?? [])} onChange={(event) => updateCondition(index, { ...condition, args: parseArgs(event.target.value) })} aria-label={`规则 ${index + 1} 参数`} /></div>)}
-      <button onClick={() => updateField("conditions", [...conditions, { rule: rules[0]?.type_id ?? "flag.is_false", args: [] }])}>+ 添加规则</button>
+      {conditions.map((condition: any, index: number) => <div className="rule-row" key={index}>
+        <div className="rule-selector"><select value={condition.rule ?? ""} onChange={(event) => replaceConditionType(index, event.target.value)}>{condition.rule && !findRule(condition.rule) && <option value={condition.rule}>{condition.rule}（未知）</option>}{rules.map((rule) => <option key={rule.type_id} value={rule.type_id}>{rule.label} · {rule.type_id}</option>)}</select><span className="field-help">{findRule(condition.rule)?.description ?? "请在 JSON 高级模式中检查该规则。"}</span></div>
+        <ArgumentFields item={findRule(condition.rule)} args={condition.args ?? []} references={references} onChange={(args) => updateCondition(index, { ...condition, args })} />
+      </div>)}
+      <button onClick={() => updateField("conditions", [...conditions, { rule: rules[0]?.type_id ?? "flag.is_false", args: defaultArgs(rules[0]) }])}>+ 添加规则</button>
     </div>
     <div className="subsection"><div className="subsection-title">选项与效果 <span>{choices.length}</span></div>
-      {choices.map((choice: any, choiceIndex: number) => <div className="choice-editor" key={choiceIndex}><label>选项文本<input value={choice.text ?? ""} onChange={(event) => updateChoice(choiceIndex, { ...choice, text: event.target.value })} /></label>{(choice.effects ?? []).map((effect: any, effectIndex: number) => <div className="rule-row" key={effectIndex}><select value={effect.effect ?? ""} onChange={(event) => { const next = [...choice.effects]; next[effectIndex] = { ...effect, effect: event.target.value }; updateChoice(choiceIndex, { ...choice, effects: next }); }}>{effects.map((item) => <option key={item.type_id} value={item.type_id}>{item.type_id}</option>)}</select><input value={JSON.stringify(effect.args ?? [])} onChange={(event) => { const next = [...choice.effects]; next[effectIndex] = { ...effect, args: parseArgs(event.target.value) }; updateChoice(choiceIndex, { ...choice, effects: next }); }} aria-label={`选项 ${choiceIndex + 1} 效果 ${effectIndex + 1} 参数`} /></div>)}<button onClick={() => updateChoice(choiceIndex, { ...choice, effects: [...(choice.effects ?? []), { effect: effects[0]?.type_id ?? "flag.set", args: [] }] })}>+ 添加效果</button></div>)}
+      {choices.map((choice: any, choiceIndex: number) => <div className="choice-editor" key={choiceIndex}>
+        <label>选项文本<input value={choice.text ?? ""} onChange={(event) => updateChoice(choiceIndex, { ...choice, text: event.target.value })} /></label>
+        <div className="choice-conditions"><div className="subsection-title">显示条件 <span>{choice.visible_if?.length ?? 0}</span></div>
+          {(choice.visible_if ?? []).map((condition: any, conditionIndex: number) => <div className="rule-row" key={conditionIndex}>
+            <div className="rule-selector"><select value={condition.rule ?? ""} onChange={(event) => replaceVisibleConditionType(choiceIndex, conditionIndex, event.target.value)}>{condition.rule && !findRule(condition.rule) && <option value={condition.rule}>{condition.rule}（未知）</option>}{rules.map((rule) => <option key={rule.type_id} value={rule.type_id}>{rule.label} · {rule.type_id}</option>)}</select><span className="field-help">{findRule(condition.rule)?.description ?? "请在 JSON 高级模式中检查该规则。"}</span></div>
+            <ArgumentFields item={findRule(condition.rule)} args={condition.args ?? []} references={references} onChange={(args) => { const visibleIf = [...choice.visible_if]; visibleIf[conditionIndex] = { ...condition, args }; updateChoice(choiceIndex, { ...choice, visible_if: visibleIf }); }} />
+          </div>)}
+          <button onClick={() => updateChoice(choiceIndex, { ...choice, visible_if: [...(choice.visible_if ?? []), { rule: rules[0]?.type_id ?? "flag.is_false", args: defaultArgs(rules[0]) }] })}>+ 添加显示条件</button>
+        </div>
+        <div className="choice-effects"><div className="subsection-title">执行效果 <span>{choice.effects?.length ?? 0}</span></div>
+          {(choice.effects ?? []).map((effect: any, effectIndex: number) => <div className="rule-row" key={effectIndex}>
+            <div className="rule-selector"><select value={effect.effect ?? ""} onChange={(event) => replaceEffectType(choiceIndex, effectIndex, event.target.value)}>{effect.effect && !findEffect(effect.effect) && <option value={effect.effect}>{effect.effect}（未知）</option>}{effects.map((item) => <option key={item.type_id} value={item.type_id}>{item.label} · {item.type_id}</option>)}</select><span className="field-help">{findEffect(effect.effect)?.description ?? "请在 JSON 高级模式中检查该效果。"}</span></div>
+            <ArgumentFields item={findEffect(effect.effect)} args={effect.args ?? []} references={references} onChange={(args) => { const next = [...choice.effects]; next[effectIndex] = { ...effect, args }; updateChoice(choiceIndex, { ...choice, effects: next }); }} />
+          </div>)}
+          <p className="field-help">效果按照从上到下的顺序执行。</p>
+          <button onClick={() => updateChoice(choiceIndex, { ...choice, effects: [...(choice.effects ?? []), { effect: effects[0]?.type_id ?? "flag.set", args: defaultArgs(effects[0]) }] })}>+ 添加效果</button>
+        </div>
+      </div>)}
       <button onClick={() => updateField("choices", [...choices, { text: "新选项", effects: [] }])}>+ 添加选项</button>
     </div>
   </div>;
+}
+
+function ArgumentFields({ item, args, references, onChange }: { item?: RegistryItem; args: unknown[]; references: ReferenceItem[]; onChange: (args: unknown[]) => void }) {
+  if (!item) return <div className="argument-fields"><span className="field-help">未知类型：请切换到 JSON 高级模式检查参数。</span></div>;
+  return <div className="argument-fields">{item.parameters.map((parameter, index) => {
+    const value = args[index] ?? parameter.default ?? "";
+    const setValue = (next: unknown) => { const nextArgs = [...args]; nextArgs[index] = next; onChange(nextArgs); };
+    const options = parameter.reference_type ? references.filter((reference) => reference.type === parameter.reference_type) : [];
+    const current = String(value ?? "");
+    const hasCurrent = current !== "" && options.some((option) => option.id === current);
+    return <label className="parameter-field" key={parameter.name}>
+      <span>{parameter.label}{parameter.required ? " *" : ""}</span>
+      {parameter.widget === "reference_select" ? <select value={current} onChange={(event) => setValue(event.target.value)}>{current && !hasCurrent && <option value={current}>{current}（缺失引用）</option>}{options.map((option) => <option key={option.id} value={option.id}>{option.label} · {option.id}{option.valid ? "" : "（缺失引用）"}</option>)}</select>
+        : parameter.widget === "boolean" ? <input type="checkbox" checked={Boolean(value)} onChange={(event) => setValue(event.target.checked)} />
+          : parameter.widget === "integer" || parameter.widget === "number" ? <input type="number" step={parameter.widget === "integer" ? 1 : "any"} value={value as number} onChange={(event) => setValue(event.target.value === "" ? "" : Number(event.target.value))} />
+            : <input value={String(value)} onChange={(event) => setValue(event.target.value)} />}
+      <small className="field-help">{parameter.description}{parameter.reference_type ? ` · 来源：${parameter.reference_type}` : ""}</small>
+    </label>;
+  })}</div>;
 }
 
 function RuntimePanel({ commandText, setCommandText, runCommand, trace, candidates, stateDiff, changedByPath, setChangedByPath, inspectChangedBy, changedByMatches }: { commandText: string; setCommandText: (value: string) => void; runCommand: () => void; trace: Record<string, unknown> | null; candidates: Record<string, unknown> | null; stateDiff: Record<string, unknown> | null; changedByPath: string; setChangedByPath: (value: string) => void; inspectChangedBy: () => void; changedByMatches: Record<string, unknown>[] }) {

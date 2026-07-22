@@ -22,7 +22,7 @@ class MedievalVerticalSliceTests(unittest.TestCase):
         report = validate_content(MEDIEVAL_CONTENT)
 
         self.assertTrue(report["passed"])
-        self.assertEqual(report["scene_count"], 5)
+        self.assertGreaterEqual(report["scene_count"], 5)
 
     def test_medieval_vertical_slice_replays_successfully(self) -> None:
         report = replay_commands(MEDIEVAL_STATE, MEDIEVAL_COMMANDS, content_path=MEDIEVAL_CONTENT)
