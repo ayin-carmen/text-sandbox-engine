@@ -43,6 +43,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 export const api = {
   open: (root: string) => request<{ root: string; content_root: string; state_path: string; scene_count: number }>("/api/workspaces/open", { method: "POST", body: JSON.stringify({ root }) }),
   tree: () => request<{ entries: Array<{ path: string; kind: string; revision: string }> }>("/api/workspaces/tree"),
+  sourceState: () => request<{ state: Record<string, unknown>; path: string; revision: string }>("/api/workspaces/state"),
   scenes: () => request<{ scenes: SceneRecord[] }>("/api/content/scenes"),
   saveScene: (sceneId: string, document: Record<string, unknown>, revision: string) => request<SceneRecord>(`/api/content/scenes/${encodeURIComponent(sceneId)}`, { method: "PUT", body: JSON.stringify({ document, revision }) }),
   createScene: (document: Record<string, unknown>) => request<SceneRecord>("/api/content/scenes", { method: "POST", body: JSON.stringify({ document }) }),
@@ -55,4 +56,6 @@ export const api = {
   createSession: () => request<{ session_id: string; state: Record<string, unknown>; traces: unknown[] }>("/api/runtime/sessions", { method: "POST" }),
   command: (sessionId: string, command: Record<string, unknown>) => request<{ status: string; trace: Record<string, unknown>; state: Record<string, unknown>; traces: unknown[] }>(`/api/runtime/sessions/${sessionId}/commands`, { method: "POST", body: JSON.stringify({ command }) }),
   candidates: (sessionId?: string) => request<Record<string, unknown>>("/api/diagnostics/scene-candidates", { method: "POST", body: JSON.stringify({ session_id: sessionId ?? null }) }),
+  stateDiff: (before: Record<string, unknown>, after: Record<string, unknown>) => request<{ changes: Array<Record<string, unknown>> }>("/api/diagnostics/state-diff", { method: "POST", body: JSON.stringify({ before, after }) }),
+  changedBy: (trace: Record<string, unknown>, path: string) => request<{ matches: Array<Record<string, unknown>> }>("/api/diagnostics/changed-by", { method: "POST", body: JSON.stringify({ trace, path }) }),
 };

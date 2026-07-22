@@ -8,6 +8,7 @@ __pycache__/
 htmlcov/
 dist/
 build/
+build/editor-runtime/
 editor/node_modules/
 editor/dist/
 src-tauri/target/

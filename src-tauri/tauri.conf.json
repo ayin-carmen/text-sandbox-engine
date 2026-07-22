@@ -16,6 +16,7 @@
   "bundle": {
     "active": true,
     "targets": ["nsis"],
+    "resources": { "../build/editor-runtime/text-sandbox-editor-api.exe": "text-sandbox-editor-api.exe" },
     "windows": { "nsis": { "installMode": "currentUser" } }
   }
 }

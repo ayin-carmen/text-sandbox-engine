@@ -27,11 +27,16 @@ function App() {
   const [issues, setIssues] = useState<Diagnostic[]>([]);
   const [message, setMessage] = useState("等待打开工作区");
   const [graph, setGraph] = useState<GraphData | null>(null);
+  const [graphTypeFilter, setGraphTypeFilter] = useState("all");
+  const [graphRelationFilter, setGraphRelationFilter] = useState("all");
   const [registryItems, setRegistryItems] = useState<RegistryItem[]>([]);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [state, setState] = useState<Record<string, unknown> | null>(null);
+  const [stateDiff, setStateDiff] = useState<Record<string, unknown> | null>(null);
   const [trace, setTrace] = useState<Record<string, unknown> | null>(null);
   const [candidates, setCandidates] = useState<Record<string, unknown> | null>(null);
+  const [changedByMatches, setChangedByMatches] = useState<Record<string, unknown>[]>([]);
+  const [changedByPath, setChangedByPath] = useState("entities.actor.player.components.location.current");
   const [commandText, setCommandText] = useState(JSON.stringify({ type: "space.travel_to", actor: "actor.player", target: "location.market_square", args: {} }, null, 2));
 
   const openWorkspace = async () => {
@@ -43,6 +48,7 @@ function App() {
       setSelected(sceneResult.scenes[0] ?? null);
       setGraph(await api.graph());
       setRegistryItems((await api.registry()).items);
+      setState((await api.sourceState()).state);
       setMessage(`已打开 ${result.root}`);
       setIssues([]);
     } catch (error) {
@@ -137,6 +143,7 @@ function App() {
         setState(created.state);
       }
       const result = await api.command(activeSessionId, command);
+      setStateDiff(await api.stateDiff(state ?? {}, result.state));
       setState(result.state);
       setTrace(result.trace);
       setCandidates(await api.candidates(activeSessionId));
@@ -144,6 +151,14 @@ function App() {
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "回放失败");
     }
+  };
+
+  const inspectChangedBy = async () => {
+    if (!trace) return;
+    try {
+      setChangedByMatches((await api.changedBy(trace, changedByPath)).matches);
+      setMessage(`已查询字段来源：${changedByPath}`);
+    } catch (error) { setMessage(error instanceof Error ? error.message : "Changed By 查询失败"); }
   };
 
   const formDocument = useMemo(() => {
@@ -160,9 +175,11 @@ function App() {
   };
 
   const graphElements = graph ? [
-    ...graph.nodes.map((node) => ({ data: node })),
-    ...graph.edges.map((edge) => ({ data: edge })),
+    ...graph.nodes.filter((node) => graphTypeFilter === "all" || node.type === graphTypeFilter).map((node) => ({ data: node })),
+    ...graph.edges.filter((edge) => graphRelationFilter === "all" || edge.relation === graphRelationFilter).map((edge) => ({ data: edge })),
   ] : [];
+  const graphNodeTypes = [...new Set(graph?.nodes.map((node) => node.type) ?? [])];
+  const graphRelations = [...new Set(graph?.edges.map((edge) => edge.relation) ?? [])];
 
   return (
     <div className="app-shell">
@@ -200,8 +217,8 @@ function App() {
           {!selected && <div className="empty">打开一个真实内容包开始编辑。</div>}
           {selected && tab === "form" && <SceneForm document={formDocument} updateField={updateField} registryItems={registryItems} />}
           {selected && tab === "json" && <div className="monaco-wrap"><Editor height="560px" language="json" theme="vs-dark" value={rawJson} onChange={(value) => setRawJson(value ?? "")} options={{ minimap: { enabled: false }, fontSize: 13, wordWrap: "on" }} /></div>}
-          {tab === "graph" && <div className="graph-wrap"><CytoscapeComponent elements={graphElements} stylesheet={graphStyle} layout={{ name: "cose", animate: false }} style={{ width: "100%", height: "620px" }} cy={(instance: any) => instance.on("tap", "node", (event: any) => setMessage(`节点：${event.target.data("label")} · 类型：${event.target.data("type")}`))} /></div>}
-          {tab === "runtime" && <RuntimePanel commandText={commandText} setCommandText={setCommandText} runCommand={runCommand} trace={trace} candidates={candidates} />}
+          {tab === "graph" && <div className="graph-view"><div className="viz-controls"><label>节点类型<select value={graphTypeFilter} onChange={(event) => setGraphTypeFilter(event.target.value)}><option value="all">全部</option>{graphNodeTypes.map((type) => <option key={type} value={type}>{type}</option>)}</select></label><label>引用关系<select value={graphRelationFilter} onChange={(event) => setGraphRelationFilter(event.target.value)}><option value="all">全部</option>{graphRelations.map((relation) => <option key={relation} value={relation}>{relation}</option>)}</select></label></div><div className="graph-wrap"><CytoscapeComponent elements={graphElements} stylesheet={graphStyle} layout={{ name: "cose", animate: false }} style={{ width: "100%", height: "620px" }} cy={(instance: any) => instance.on("tap", "node", (event: any) => setMessage(`节点：${event.target.data("label")} · 类型：${event.target.data("type")}`))} /></div></div>}
+          {tab === "runtime" && <RuntimePanel commandText={commandText} setCommandText={setCommandText} runCommand={runCommand} trace={trace} candidates={candidates} stateDiff={stateDiff} changedByPath={changedByPath} setChangedByPath={setChangedByPath} inspectChangedBy={inspectChangedBy} changedByMatches={changedByMatches} />}
           {tab === "state" && <div className="state-view"><pre>{JSON.stringify(state ?? {}, null, 2)}</pre></div>}
         </section>
         <aside className="inspector">
@@ -252,8 +269,8 @@ function SceneForm({ document, updateField, registryItems }: { document: Record<
   </div>;
 }
 
-function RuntimePanel({ commandText, setCommandText, runCommand, trace, candidates }: { commandText: string; setCommandText: (value: string) => void; runCommand: () => void; trace: Record<string, unknown> | null; candidates: Record<string, unknown> | null }) {
-  return <div className="runtime-view"><div className="runtime-toolbar"><div><p className="eyebrow">ISOLATED SESSION</p><h1>运行预览</h1></div><button className="primary" onClick={runCommand}><Play size={16} />执行命令</button></div><textarea className="command-editor" value={commandText} onChange={(event) => setCommandText(event.target.value)} aria-label="命令 JSON" /><div className="runtime-results"><div><h2>Trace</h2><pre>{JSON.stringify(trace ?? {}, null, 2)}</pre></div><div><h2>场景候选</h2><pre>{JSON.stringify(candidates ?? {}, null, 2)}</pre></div></div></div>;
+function RuntimePanel({ commandText, setCommandText, runCommand, trace, candidates, stateDiff, changedByPath, setChangedByPath, inspectChangedBy, changedByMatches }: { commandText: string; setCommandText: (value: string) => void; runCommand: () => void; trace: Record<string, unknown> | null; candidates: Record<string, unknown> | null; stateDiff: Record<string, unknown> | null; changedByPath: string; setChangedByPath: (value: string) => void; inspectChangedBy: () => void; changedByMatches: Record<string, unknown>[] }) {
+  return <div className="runtime-view"><div className="runtime-toolbar"><div><p className="eyebrow">ISOLATED SESSION</p><h1>运行预览</h1></div><button className="primary" onClick={runCommand}><Play size={16} />执行命令</button></div><textarea className="command-editor" value={commandText} onChange={(event) => setCommandText(event.target.value)} aria-label="命令 JSON" /><div className="runtime-results"><div><h2>Trace</h2><pre>{JSON.stringify(trace ?? {}, null, 2)}</pre></div><div><h2>场景候选</h2><pre>{JSON.stringify(candidates ?? {}, null, 2)}</pre></div><div><h2>State Diff</h2><pre>{JSON.stringify(stateDiff ?? {}, null, 2)}</pre></div><div><h2>Changed By</h2><div className="changed-by-controls"><input value={changedByPath} onChange={(event) => setChangedByPath(event.target.value)} aria-label="状态字段路径" /><button onClick={inspectChangedBy}>查询</button></div><pre>{JSON.stringify(changedByMatches, null, 2)}</pre></div></div></div>;
 }
 
 const graphStyle: any[] = [

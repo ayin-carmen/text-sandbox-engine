@@ -104,3 +104,4 @@ PYTHONPATH=src python -m text_sandbox_engine.cli changed-by --trace trace.json -
 14. 正式玩法模块：物品、社交信任、任务阶段、动态准入和场景已见历史。
 15. 阶段 8 编辑器适配层和本地 API。
 16. 阶段 8 React 编辑器和 Tauri 桌面配置。
+17. 阶段 8 API 单文件打包脚本和 GitHub Actions Windows 安装包构建流程。

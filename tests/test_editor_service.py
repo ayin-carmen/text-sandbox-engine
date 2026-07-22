@@ -69,6 +69,17 @@ class EditorServiceTests(unittest.TestCase):
         self.assertIn("registry.unknown_rule", {issue["code"] for issue in report["issues"]})
         self.assertTrue(all(issue["json_path"].startswith("$") for issue in report["issues"]))
 
+    def test_source_state_and_registry_metadata_are_editor_dtos(self) -> None:
+        service = EditorService()
+        service.open_workspace(MEDIEVAL_ROOT)
+
+        source = service.source_state()
+        metadata = service.registry_metadata()
+
+        self.assertEqual(source["state"]["schema_version"], 1)
+        self.assertTrue(source["revision"])
+        self.assertIn("flag.set", {item["type_id"] for item in metadata["items"]})
+
 
 if __name__ == "__main__":
     unittest.main()

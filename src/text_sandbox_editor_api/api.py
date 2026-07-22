@@ -70,6 +70,10 @@ def create_app(service: EditorService | None = None) -> FastAPI:
     def refresh_workspace():
         return editor.refresh()
 
+    @app.get("/api/workspaces/state")
+    def source_state():
+        return editor.source_state()
+
     @app.get("/api/content/scenes")
     def list_scenes():
         return {"scenes": editor.scenes()}

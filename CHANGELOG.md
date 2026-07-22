@@ -14,6 +14,7 @@
 - 新增原子 JSON 保存、同目录备份、修订标识和外部修改冲突检测。
 - 新增 `editor/` React + TypeScript + Vite 编辑器，包含内容树、结构化场景表单、Monaco JSON 源码视图、Cytoscape 关系图、运行预览和问题面板。
 - 新增 `src-tauri/` Tauri 2 最小桌面壳配置，负责窗口和本地 Python API 进程生命周期。
+- 新增 `scripts/package_editor.ps1` 和 `.github/workflows/phase8-desktop.yml`，支持将 FastAPI 打包成单文件并构建 Windows NSIS 安装包。
 - 新增 `docs/phase_8_editor_usage.md` 阶段 8 编辑器和桌面构建使用说明。
 
 ### 变更
@@ -28,7 +29,8 @@
 - 通过 `python -m unittest discover -s tests`，共 34 个测试。
 - 通过 FastAPI TestClient 打开 `examples/medieval_town`，读取 5 个真实场景、生成 45 条关系边、启动隔离会话并成功执行移动命令。
 - 通过 `npm run build`，TypeScript 检查和 Vite 生产构建成功。
-- 当前环境未安装 Rust/Cargo，因此 Tauri 安装包尚未在本机实际编译；Tauri 配置和启动/退出逻辑已加入仓库。
+- 通过 PyInstaller 生成 `build/editor-runtime/text-sandbox-editor-api.exe`，启动后成功打开真实中世纪小镇内容包并返回 5 个场景。
+- 当前环境的 Rust 安装源未完成，因此 Tauri 安装包由新增 GitHub Actions Windows 构建流程负责验证。
 
 ## 2026-07-21 - 新增使用说明
 

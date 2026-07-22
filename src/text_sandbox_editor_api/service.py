@@ -86,6 +86,11 @@ class EditorService:
     def refresh(self) -> dict[str, Any]:
         return self.tree()
 
+    def source_state(self) -> dict[str, Any]:
+        self._require_workspace()
+        assert self.state_path is not None
+        return {"state": load_world_state(self.state_path), "path": str(self.state_path), "revision": _revision(self.state_path)}
+
     def scenes(self) -> list[dict[str, Any]]:
         return self._scene_records()
 

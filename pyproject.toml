@@ -13,6 +13,9 @@ editor = [
     "fastapi>=0.115",
     "uvicorn>=0.30",
 ]
+packaging = [
+    "pyinstaller>=6.10",
+]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

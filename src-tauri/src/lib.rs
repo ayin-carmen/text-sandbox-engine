@@ -7,10 +7,18 @@ struct ApiProcess(Mutex<Option<Child>>);
 pub fn run() {
     tauri::Builder::default()
         .setup(|app| {
-            let child = Command::new("python")
-                .args(["-m", "text_sandbox_editor_api"])
-                .spawn()
-                .ok();
+            let packaged_api = app
+                .path()
+                .resource_dir()
+                .ok()
+                .map(|path| path.join("text-sandbox-editor-api.exe"));
+            let child = match packaged_api.filter(|path| path.exists()) {
+                Some(path) => Command::new(path).spawn().ok(),
+                None => Command::new("python")
+                    .args(["-m", "text_sandbox_editor_api"])
+                    .spawn()
+                    .ok(),
+            };
             app.manage(ApiProcess(Mutex::new(child)));
             Ok(())
         })
