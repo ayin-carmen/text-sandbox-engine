@@ -146,7 +146,7 @@ function EntityIcon({ type }: { type: EntityType }) {
   return type === "actor" ? <UserRound size={15} /> : type === "location" ? <MapPin size={15} /> : <Package size={15} />;
 }
 
-function EntityForm({ document, references, onChange }: { document: Record<string, unknown>; references: ReferenceItem[]; onChange: (document: Record<string, unknown>) => void }) {
+export function EntityForm({ document, references, onChange }: { document: Record<string, unknown>; references: ReferenceItem[]; onChange: (document: Record<string, unknown>) => void }) {
   const type = document.type as EntityType;
   const components = (document.components as Record<string, any>) ?? {};
   const update = (path: string, value: unknown) => {

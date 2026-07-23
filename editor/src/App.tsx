@@ -297,7 +297,7 @@ function App() {
   return (
     <div className="app-shell">
       <header className="topbar">
-        <div className="brand"><Sparkles size={18} /> Text Sandbox Editor <span className="version">阶段 8</span></div>
+        <div className="brand"><Sparkles size={18} /> Text Sandbox Editor <span className="version">阶段 10</span></div>
         <div className="workspace-open">
           <input aria-label="工作区路径" value={root} onChange={(event) => setRoot(event.target.value)} />
           <button className="primary" onClick={openWorkspace}><FolderOpen size={16} />打开</button>

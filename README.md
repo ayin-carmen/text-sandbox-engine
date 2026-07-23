@@ -16,6 +16,10 @@
   阶段 9 交付范围、接口、验证结果和兼容性报告。
 - `docs/phase_10_world_entity_editor_plan.md`
   阶段 10 世界实体编辑器方案，规划角色、地点和物品的创建与维护。
+- `docs/phase_10_world_entity_editor_usage.md`
+  阶段 10 世界实体创建、编辑、引用影响和安全保存使用说明。
+- `docs/phase_10_completion_report.md`
+  阶段 10 交付范围、接口、兼容性和验证报告。
 
 - `docs/professional_text_sandbox_engine_architecture.txt`  
   专业化文字沙盒引擎架构方案，包含核心原则、运行时架构、数据模型、模块系统、内容系统、存档迁移、诊断测试与未来计划。
@@ -91,7 +95,7 @@ PYTHONPATH=src python -m text_sandbox_engine.cli changed-by --trace trace.json -
 
 ## Current Status
 
-项目已完成阶段 9，阶段 10 方案已确定：建设角色、地点和物品的世界实体编辑器。
+项目已完成阶段 9，阶段 10 世界实体编辑器正在完成最终验证。
 
 已完成：
 
