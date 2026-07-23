@@ -50,12 +50,33 @@ class PhaseTenEntityApiE2ETests(unittest.TestCase):
             self.assertEqual(location["type"], "location")
             self.assertEqual(item["type"], "item")
 
+            scene = client.post("/api/content/scenes/from-template", json={
+                "name": "渡船凭证测试",
+                "namespace": "greybrook",
+                "slug": "river_token_test",
+                "location": "location.west_gate",
+                "template": "narrative",
+                "repeat_policy": "always",
+                "priority": 99,
+                "preview": False,
+            }).json()["scene"]
+            scene_document = scene["document"]
+            scene_document["choices"][0]["effects"] = [{"effect": "inventory.add_item", "args": ["actor.player", item["id"]]}]
+            saved_scene = client.put(f"/api/content/scenes/{scene['id']}", json={"document": scene_document, "revision": scene["revision"]})
+            self.assertEqual(saved_scene.status_code, 200)
+
             listed = client.get("/api/world/entities", params={"type": "item", "query": "凭证"}).json()["entities"]
             self.assertEqual([entry["id"] for entry in listed], ["item.greybrook.river_token"])
             self.assertTrue(any(entry["id"] == "item.greybrook.river_token" and entry["valid"] for entry in client.get("/api/metadata/references", params={"type": "item"}).json()["references"]))
             graph = client.get("/api/graph/content").json()
             self.assertIn("actor.greybrook.ferryman", {node["id"] for node in graph["nodes"]})
             self.assertTrue(any(edge["relation"] == "located_at" for edge in graph["edges"]))
+
+            session = client.post("/api/runtime/sessions").json()
+            actions = client.get(f"/api/runtime/sessions/{session['session_id']}/actions").json()
+            choice = next(action for action in actions["actions"] if action["kind"] == "choice" and action["command"]["target"] == scene["id"])
+            played = client.post(f"/api/runtime/sessions/{session['session_id']}/commands", json={"command": choice["command"]}).json()
+            self.assertIn(item["id"], played["state"]["entities"]["actor.player"]["components"]["inventory"]["items"])
 
             current_actor = client.get(f"/api/world/entities/{actor['id']}").json()
             revision = current_actor["revision"]
