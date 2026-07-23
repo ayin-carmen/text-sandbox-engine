@@ -94,6 +94,243 @@ class EditorService:
         assert self.state_path is not None
         return {"state": load_world_state(self.state_path), "path": str(self.state_path), "revision": _revision(self.state_path)}
 
+    def entity_types(self) -> dict[str, Any]:
+        return {"types": [dict(item) for item in _ENTITY_TYPES]}
+
+    def entity_templates(self) -> dict[str, Any]:
+        return {"templates": [dict(item) for item in _ENTITY_TEMPLATES]}
+
+    def entities(self, entity_type: str | None = None, query: str | None = None) -> dict[str, Any]:
+        self._require_workspace()
+        assert self.state_path is not None
+        state = load_world_state(self.state_path)
+        normalized_query = query.strip().casefold() if query else ""
+        result: list[dict[str, Any]] = []
+        for entity_id, document in state.get("entities", {}).items():
+            if not isinstance(document, dict):
+                continue
+            kind = str(document.get("type", ""))
+            if entity_type and kind != entity_type:
+                continue
+            label = _entity_label(document, entity_id)
+            tags = [str(tag) for tag in document.get("tags", []) if isinstance(tag, str)]
+            haystack = " ".join([entity_id, label, *tags]).casefold()
+            if normalized_query and normalized_query not in haystack:
+                continue
+            result.append({
+                "id": entity_id,
+                "type": kind,
+                "label": label,
+                "tags": tags,
+                "path": f"{self._source_label(self.state_path)}#/entities/{entity_id}",
+                "revision": _revision(self.state_path),
+                "diagnostic_count": len(self._validate_entity_document(document, state, entity_id)),
+            })
+        return {"entities": sorted(result, key=lambda item: (item["type"], item["label"], item["id"]))}
+
+    def entity(self, entity_id: str) -> dict[str, Any]:
+        self._require_workspace()
+        assert self.state_path is not None
+        state = load_world_state(self.state_path)
+        document = state.get("entities", {}).get(entity_id)
+        if not isinstance(document, dict):
+            raise KeyError(f"entity not found: {entity_id}")
+        return {
+            "id": entity_id,
+            "type": document.get("type"),
+            "path": f"{self._source_label(self.state_path)}#/entities/{entity_id}",
+            "revision": _revision(self.state_path),
+            "document": document,
+        }
+
+    def entity_from_template(
+        self,
+        *,
+        entity_type: str,
+        namespace: str,
+        slug: str,
+        name: str,
+        tags: list[str],
+        location: str | None = None,
+        template_id: str = "basic",
+        preview: bool = False,
+    ) -> dict[str, Any]:
+        self._require_workspace()
+        template = next((item for item in _ENTITY_TEMPLATES if item["id"] == template_id and item["type"] == entity_type), None)
+        if template is None:
+            raise ValueError(f"unknown entity template: {entity_type}/{template_id}")
+        if not re.fullmatch(r"[a-z][a-z0-9_-]*", namespace):
+            raise ValueError("namespace must contain lowercase letters, digits, underscores, or hyphens")
+        if not re.fullmatch(r"[a-z][a-z0-9_-]*", slug):
+            raise ValueError("slug must start with a lowercase letter and contain only lowercase letters, digits, underscores, or hyphens")
+        entity_id = f"{entity_type}.{namespace}.{slug}"
+        assert self.state_path is not None
+        state = load_world_state(self.state_path)
+        if entity_id in state.get("entities", {}):
+            raise ValueError(f"entity id already exists: {entity_id}")
+        document = deepcopy(template["document"])
+        document["id"] = entity_id
+        document["tags"] = list(dict.fromkeys(tag.strip() for tag in tags if tag.strip()))
+        if name.strip():
+            _set_entity_name(document, name.strip())
+        if entity_type == "actor" and location:
+            document.setdefault("components", {}).setdefault("location", {})["current"] = location
+        if entity_type == "location" and location:
+            document.setdefault("components", {}).setdefault("map_node", {})["connections"] = [location]
+        report = self.validate_world_state({**state, "entities": {**state.get("entities", {}), entity_id: document}})
+        entity_issues = [issue for issue in report["issues"] if issue.get("json_path", "").startswith(f'$.entities["{entity_id}"]')]
+        result = {
+            "id": entity_id,
+            "requested_id": entity_id,
+            "template": template_id,
+            "document": document,
+            "issues": entity_issues,
+            "passed": not entity_issues,
+            "conflict_resolved": False,
+        }
+        if preview:
+            return result
+        if entity_issues:
+            raise ValueError(json.dumps({"passed": False, "issues": entity_issues}, ensure_ascii=False))
+        return {**result, "entity": self.create_entity(document)}
+
+    def create_entity(self, document: dict[str, Any]) -> dict[str, Any]:
+        self._require_workspace()
+        assert self.state_path is not None
+        state = load_world_state(self.state_path)
+        entity_id = str(document.get("id", ""))
+        if entity_id in state.get("entities", {}):
+            raise ValueError(f"entity id already exists: {entity_id}")
+        next_state = deepcopy(state)
+        next_state.setdefault("entities", {})[entity_id] = deepcopy(document)
+        report = self.validate_world_state(next_state)
+        if report["issues"]:
+            raise ValueError(json.dumps(report, ensure_ascii=False))
+        _atomic_json_write(self.state_path, next_state)
+        return self.entity(entity_id)
+
+    def save_entity(self, entity_id: str, document: dict[str, Any], revision: str) -> dict[str, Any]:
+        self._require_workspace()
+        assert self.state_path is not None
+        self._assert_revision(self.state_path, revision)
+        state = load_world_state(self.state_path)
+        current = state.get("entities", {}).get(entity_id)
+        if not isinstance(current, dict):
+            raise KeyError(f"entity not found: {entity_id}")
+        if document.get("id") != entity_id:
+            raise ValueError("entity id cannot be changed through the save endpoint")
+        if document.get("type") != current.get("type"):
+            raise ValueError("entity type cannot be changed through the save endpoint")
+        next_state = deepcopy(state)
+        next_state["entities"][entity_id] = deepcopy(document)
+        report = self.validate_world_state(next_state)
+        if report["issues"]:
+            raise ValueError(json.dumps(report, ensure_ascii=False))
+        _atomic_json_write(self.state_path, next_state)
+        return self.entity(entity_id)
+
+    def delete_entity(self, entity_id: str, revision: str) -> dict[str, Any]:
+        self._require_workspace()
+        assert self.state_path is not None
+        self._assert_revision(self.state_path, revision)
+        state = load_world_state(self.state_path)
+        if entity_id not in state.get("entities", {}):
+            raise KeyError(f"entity not found: {entity_id}")
+        usages = self.entity_usages(entity_id)["usages"]
+        if usages:
+            raise RevisionConflict(json.dumps({"entity_id": entity_id, "usages": usages}, ensure_ascii=False))
+        next_state = deepcopy(state)
+        del next_state["entities"][entity_id]
+        report = self.validate_world_state(next_state)
+        if report["issues"]:
+            raise ValueError(json.dumps(report, ensure_ascii=False))
+        _atomic_json_write(self.state_path, next_state)
+        return {"deleted": entity_id}
+
+    def validate_world_state(self, state: dict[str, Any] | None = None) -> dict[str, Any]:
+        self._require_workspace()
+        assert self.state_path is not None
+        current = deepcopy(state) if state is not None else load_world_state(self.state_path)
+        issues: list[dict[str, Any]] = []
+        entities = current.get("entities")
+        if not isinstance(entities, dict):
+            return {"passed": False, "issues": [_issue("world.schema_violation", "entities 必须是对象", self.state_path, "$.entities")]}
+        for entity_id, document in entities.items():
+            issues.extend(self._validate_entity_document(document, current, str(entity_id)))
+        known = {str(key): value.get("type") for key, value in entities.items() if isinstance(value, dict)}
+        for entity_id, document in entities.items():
+            if not isinstance(document, dict):
+                continue
+            components = document.get("components", {})
+            if not isinstance(components, dict):
+                continue
+            location = components.get("location", {}).get("current") if isinstance(components.get("location"), dict) else None
+            if location and known.get(location) != "location":
+                issues.append(_issue("reference.missing_target", f"找不到地点引用：{location}", self.state_path, _entity_json_path(str(entity_id), "components.location.current"), str(entity_id), "请选择已有地点。"))
+            items = components.get("inventory", {}).get("items", []) if isinstance(components.get("inventory"), dict) else []
+            if isinstance(items, list):
+                for index, item_id in enumerate(items):
+                    if isinstance(item_id, str) and known.get(item_id) not in {"item", None}:
+                        issues.append(_issue("reference.missing_target", f"找不到物品引用：{item_id}", self.state_path, _entity_json_path(str(entity_id), f"components.inventory.items[{index}]"), str(entity_id), "请选择已有物品。"))
+            connections = components.get("map_node", {}).get("connections", []) if isinstance(components.get("map_node"), dict) else []
+            if isinstance(connections, list):
+                for index, target in enumerate(connections):
+                    if isinstance(target, str) and known.get(target) != "location":
+                        issues.append(_issue("reference.missing_target", f"找不到相邻地点：{target}", self.state_path, _entity_json_path(str(entity_id), f"components.map_node.connections[{index}]"), str(entity_id), "请选择已有地点。"))
+        return {"passed": not issues, "issues": issues}
+
+    def _validate_entity_document(self, document: Any, state: dict[str, Any], entity_id: str) -> list[dict[str, Any]]:
+        assert self.state_path is not None
+        base = f'$.entities["{entity_id}"]'
+        issues: list[dict[str, Any]] = []
+        if not isinstance(document, dict):
+            return [_issue("world.entity_schema_violation", "实体必须是对象", self.state_path, base, entity_id)]
+        if document.get("id") != entity_id:
+            issues.append(_issue("world.entity_id_mismatch", "实体 id 必须与 entities key 一致", self.state_path, f"{base}.id", entity_id, "请保持实体 ID 与列表中的稳定 ID 一致。"))
+        entity_type = document.get("type")
+        if entity_type not in {item["id"] for item in _ENTITY_TYPES}:
+            issues.append(_issue("world.unsupported_entity_type", f"暂不支持的实体类型：{entity_type}", self.state_path, f"{base}.type", entity_id, "请选择角色、地点或物品。"))
+        elif not re.fullmatch(rf"{re.escape(str(entity_type))}(\.[a-z][a-z0-9_]*)+", entity_id):
+            issues.append(_issue("world.invalid_entity_id", f"{entity_type} 的 ID 格式无效：{entity_id}", self.state_path, base, entity_id, f"请使用 {entity_type}.namespace.slug 格式。"))
+        if not isinstance(document.get("components"), dict) or not document.get("components"):
+            issues.append(_issue("world.entity_schema_violation", "实体 components 必须是非空对象", self.state_path, f"{base}.components", entity_id, "请使用实体模板创建基础组件。"))
+        if not isinstance(document.get("tags", []), list) or not all(isinstance(tag, str) and tag.strip() for tag in document.get("tags", [])):
+            issues.append(_issue("world.entity_schema_violation", "实体 tags 必须是字符串数组", self.state_path, f"{base}.tags", entity_id))
+        return issues
+
+    def entity_usages(self, entity_id: str) -> dict[str, Any]:
+        self._require_workspace()
+        assert self.state_path is not None
+        state = load_world_state(self.state_path)
+        usages: list[dict[str, Any]] = []
+        for owner_id, document in state.get("entities", {}).items():
+            if not isinstance(document, dict):
+                continue
+            components = document.get("components", {})
+            if not isinstance(components, dict):
+                continue
+            if components.get("location", {}).get("current") == entity_id:
+                usages.append({"source": self._source_label(self.state_path), "json_path": _entity_json_path(str(owner_id), "components.location.current"), "kind": "entity", "description": f"{owner_id} 的当前地点"})
+            items = components.get("inventory", {}).get("items", [])
+            if isinstance(items, list):
+                for index, value in enumerate(items):
+                    if value == entity_id:
+                        usages.append({"source": self._source_label(self.state_path), "json_path": _entity_json_path(str(owner_id), f"components.inventory.items[{index}]"), "kind": "entity", "description": f"{owner_id} 的背包物品"})
+            connections = components.get("map_node", {}).get("connections", [])
+            if isinstance(connections, list):
+                for index, value in enumerate(connections):
+                    if value == entity_id:
+                        usages.append({"source": self._source_label(self.state_path), "json_path": _entity_json_path(str(owner_id), f"components.map_node.connections[{index}]"), "kind": "entity", "description": f"{owner_id} 的相邻地点"})
+        for record in self._scene_records():
+            document = record["document"]
+            if document.get("scope", {}).get("location") == entity_id:
+                usages.append({"source": self._source_label(Path(record["path"])), "json_path": "$.scope.location", "kind": "scene", "description": f"场景 {record['id']} 的所属地点"})
+            for kind, type_id, args, json_path in _scene_argument_paths(document, self._registry()):
+                for index, value in enumerate(args):
+                    if value == entity_id:
+                        usages.append({"source": self._source_label(Path(record["path"])), "json_path": f"{json_path}[{index}]", "kind": kind, "description": f"场景 {record['id']} 的 {type_id} 引用"})
+        return {"entity_id": entity_id, "usages": usages}
+
     def scenes(self) -> list[dict[str, Any]]:
         return self._scene_records()
 
@@ -750,6 +987,36 @@ def _scene_files(root: Path) -> list[Path]:
 _REFERENCE_TYPES = {"actor", "location", "item", "quest", "scene", "flag"}
 _REFERENCE_LABELS = {"actor": "角色", "location": "地点", "item": "物品", "quest": "任务", "scene": "场景", "flag": "Flag"}
 
+_ENTITY_TYPES = [
+    {"id": "actor", "label": "角色", "description": "可以移动、对话、持有物品并参与规则判断的世界实体。"},
+    {"id": "location", "label": "地点", "description": "地图上的可到达地点，包含描述、连接和访问限制。"},
+    {"id": "item", "label": "物品", "description": "可以被角色持有并被场景效果引用的物品实体。"},
+]
+
+_ENTITY_TEMPLATES = [
+    {
+        "id": "basic",
+        "type": "actor",
+        "label": "普通角色",
+        "description": "包含名称、当前位置和空背包的角色。",
+        "document": {"id": "actor.new_actor", "type": "actor", "tags": [], "components": {"profile": {"name": "新角色"}, "location": {"current": "location.west_gate"}, "inventory": {"items": []}}, "metadata": {}},
+    },
+    {
+        "id": "basic",
+        "type": "location",
+        "label": "普通地点",
+        "description": "包含名称、描述、区域和空连接的地点。",
+        "document": {"id": "location.new_location", "type": "location", "tags": [], "components": {"description": {"name": "新地点", "text": ""}, "map_node": {"region": "greybrook", "connections": []}}, "metadata": {}},
+    },
+    {
+        "id": "basic",
+        "type": "item",
+        "label": "普通物品",
+        "description": "包含名称、描述和基础物品属性的物品。",
+        "document": {"id": "item.new_item", "type": "item", "tags": [], "components": {"description": {"name": "新物品", "text": ""}, "item": {"kind": "misc", "stackable": False, "max_stack": 1}}, "metadata": {}},
+    },
+]
+
 _SCENE_TEMPLATES = [
     {
         "id": "blank",
@@ -805,6 +1072,44 @@ def _document_reference_values(document: dict[str, Any]) -> list[tuple[str, tupl
             if isinstance(effect, dict) and isinstance(effect.get("args"), list):
                 values.append(("effect", (str(effect.get("effect", "")), effect["args"])))
     return values
+
+
+def _scene_argument_paths(document: dict[str, Any], registry: Registry) -> list[tuple[str, str, list[Any], str]]:
+    metadata = {(item["kind"], item["type_id"]): item for item in registry.metadata()}
+    result: list[tuple[str, str, list[Any], str]] = []
+    for index, condition in enumerate(document.get("conditions", [])):
+        if isinstance(condition, dict) and isinstance(condition.get("args"), list):
+            result.append(("rule", str(condition.get("rule", "")), condition["args"], f"$.conditions[{index}].args"))
+    for choice_index, choice in enumerate(document.get("choices", [])):
+        if not isinstance(choice, dict):
+            continue
+        for condition_index, condition in enumerate(choice.get("visible_if", [])):
+            if isinstance(condition, dict) and isinstance(condition.get("args"), list):
+                result.append(("rule", str(condition.get("rule", "")), condition["args"], f"$.choices[{choice_index}].visible_if[{condition_index}].args"))
+        for effect_index, effect in enumerate(choice.get("effects", [])):
+            if isinstance(effect, dict) and isinstance(effect.get("args"), list):
+                result.append(("effect", str(effect.get("effect", "")), effect["args"], f"$.choices[{choice_index}].effects[{effect_index}].args"))
+    return result
+
+
+def _entity_label(document: dict[str, Any], fallback: str) -> str:
+    components = document.get("components", {}) if isinstance(document, dict) else {}
+    if isinstance(components, dict):
+        for component_name in ("profile", "description"):
+            component = components.get(component_name)
+            if isinstance(component, dict) and component.get("name"):
+                return str(component["name"])
+    return fallback
+
+
+def _set_entity_name(document: dict[str, Any], name: str) -> None:
+    components = document.setdefault("components", {})
+    component_name = "profile" if document.get("type") == "actor" else "description"
+    components.setdefault(component_name, {})["name"] = name
+
+
+def _entity_json_path(entity_id: str, suffix: str) -> str:
+    return f'$.entities["{entity_id}"].{suffix}'
 
 
 def _human_change(path: list[Any], before: Any, after: Any, references: list[dict[str, Any]]) -> str:

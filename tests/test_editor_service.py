@@ -101,6 +101,39 @@ class EditorServiceTests(unittest.TestCase):
             {"actor"},
         )
 
+    def test_entity_templates_create_and_validate_without_breaking_legacy_ids(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir) / "town"
+            shutil.copytree(MEDIEVAL_ROOT, workspace)
+            service = EditorService()
+            service.open_workspace(workspace)
+
+            preview = service.entity_from_template(
+                entity_type="actor",
+                namespace="greybrook",
+                slug="ferryman",
+                name="摆渡人",
+                tags=["npc"],
+                location="location.west_gate",
+                preview=True,
+            )
+            self.assertTrue(preview["passed"])
+            self.assertTrue(service.validate_world_state()["passed"])
+            created = service.entity_from_template(
+                entity_type="actor",
+                namespace="greybrook",
+                slug="ferryman",
+                name="摆渡人",
+                tags=["npc"],
+                location="location.west_gate",
+            )
+            self.assertEqual(created["entity"]["document"]["components"]["profile"]["name"], "摆渡人")
+            self.assertTrue(any(item["id"] == "actor.greybrook.ferryman" and item["valid"] for item in service.references("actor")["references"]))
+            self.assertGreaterEqual(len(service.entity_usages("location.west_gate")["usages"]), 1)
+
+            with self.assertRaises(RevisionConflict):
+                service.delete_entity("location.west_gate", service.source_state()["revision"])
+
     def test_reference_index_marks_missing_actor(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = Path(temp_dir) / "town"

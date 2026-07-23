@@ -20,6 +20,22 @@ class SceneDocument(BaseModel):
     revision: str | None = None
 
 
+class EntityDocument(BaseModel):
+    document: dict[str, Any]
+    revision: str | None = None
+
+
+class EntityTemplateRequest(BaseModel):
+    entity_type: str = Field(alias="type")
+    namespace: str
+    slug: str
+    name: str = ""
+    tags: list[str] = Field(default_factory=list)
+    location: str | None = None
+    template: str = "basic"
+    preview: bool = False
+
+
 class SceneTemplateRequest(BaseModel):
     name: str = ""
     namespace: str
@@ -84,6 +100,78 @@ def create_app(service: EditorService | None = None) -> FastAPI:
     @app.get("/api/workspaces/state")
     def source_state():
         return editor.source_state()
+
+    @app.get("/api/metadata/entity-types")
+    def entity_types():
+        return editor.entity_types()
+
+    @app.get("/api/metadata/entity-templates")
+    def entity_templates():
+        return editor.entity_templates()
+
+    @app.get("/api/world/entities")
+    def list_entities(entity_type: str | None = Query(default=None, alias="type"), query: str | None = None):
+        return editor.entities(entity_type, query)
+
+    @app.get("/api/world/entities/{entity_id}")
+    def get_entity(entity_id: str):
+        try:
+            return editor.entity(entity_id)
+        except KeyError as exc:
+            raise HTTPException(404, str(exc)) from exc
+
+    @app.get("/api/world/entities/{entity_id}/usages")
+    def entity_usages(entity_id: str):
+        return editor.entity_usages(entity_id)
+
+    @app.post("/api/validation/world-state")
+    def validate_world_state():
+        return editor.validate_world_state()
+
+    @app.post("/api/world/entities/from-template")
+    def entity_from_template(payload: EntityTemplateRequest):
+        try:
+            return editor.entity_from_template(
+                entity_type=payload.entity_type,
+                namespace=payload.namespace,
+                slug=payload.slug,
+                name=payload.name,
+                tags=payload.tags,
+                location=payload.location,
+                template_id=payload.template,
+                preview=payload.preview,
+            )
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from exc
+
+    @app.post("/api/world/entities")
+    def create_entity(payload: EntityDocument):
+        try:
+            return editor.create_entity(payload.document)
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from exc
+
+    @app.put("/api/world/entities/{entity_id}")
+    def save_entity(entity_id: str, payload: EntityDocument):
+        if not payload.revision:
+            raise HTTPException(422, "revision is required")
+        try:
+            return editor.save_entity(entity_id, payload.document, payload.revision)
+        except KeyError as exc:
+            raise HTTPException(404, str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from exc
+
+    @app.delete("/api/world/entities/{entity_id}")
+    def delete_entity(entity_id: str, revision: str):
+        try:
+            return editor.delete_entity(entity_id, revision)
+        except KeyError as exc:
+            raise HTTPException(404, str(exc)) from exc
+        except RevisionConflict as exc:
+            raise HTTPException(409, str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from exc
 
     @app.get("/api/content/scenes")
     def list_scenes():
