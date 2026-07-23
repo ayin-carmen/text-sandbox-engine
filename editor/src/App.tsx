@@ -32,6 +32,8 @@ function App() {
   const [candidates, setCandidates] = useState<Record<string, unknown> | null>(null);
   const [runtimeActions, setRuntimeActions] = useState<RuntimeActions | null>(null);
   const [runtimeSummary, setRuntimeSummary] = useState<RuntimeSummary | null>(null);
+  const [runtimeBusy, setRuntimeBusy] = useState(false);
+  const [runtimeError, setRuntimeError] = useState<string | null>(null);
   const [changedByMatches, setChangedByMatches] = useState<Record<string, unknown>[]>([]);
   const [changedByPath, setChangedByPath] = useState("entities.actor.player.components.location.current");
   const [commandText, setCommandText] = useState(JSON.stringify({ type: "space.travel_to", actor: "actor.player", target: "location.market_square", args: {} }, null, 2));
@@ -67,6 +69,7 @@ function App() {
       setSessionId(null);
       setRuntimeActions(null);
       setRuntimeSummary(null);
+      setRuntimeError(null);
       setMessage(`已打开 ${result.root}`);
       setIssues([]);
     } catch (error) {
@@ -192,6 +195,9 @@ function App() {
   };
 
   const startSession = async () => {
+    if (runtimeBusy) return;
+    setRuntimeBusy(true);
+    setRuntimeError(null);
     try {
       const created = await api.createSession();
       setSessionId(created.session_id);
@@ -200,9 +206,16 @@ function App() {
       setStateDiff(null);
       setCandidates(null);
       setRuntimeSummary(null);
-      setRuntimeActions(await api.sessionActions(created.session_id));
+      setRuntimeActions(created.actions ?? await api.sessionActions(created.session_id));
       setMessage("试玩会话已启动，操作列表来自真实引擎");
-    } catch (error) { setMessage(error instanceof Error ? error.message : "启动试玩失败"); }
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : "未知错误";
+      const message = `启动试玩失败：${detail}。请重启 Python API 后重试。`;
+      setRuntimeError(message);
+      setMessage(message);
+    } finally {
+      setRuntimeBusy(false);
+    }
   };
 
   const resetSession = async () => {
@@ -309,7 +322,7 @@ function App() {
           {selected && tab === "form" && <SceneForm document={formDocument} updateField={updateField} registryItems={registryItems} references={references} focusedPath={focusedPath} />}
           {selected && tab === "json" && <div className="monaco-wrap"><Editor height="560px" language="json" theme="vs-dark" value={rawJson} onChange={(value) => setRawJson(value ?? "")} options={{ minimap: { enabled: false }, fontSize: 13, wordWrap: "on" }} /></div>}
           {tab === "graph" && <div className="graph-view"><div className="viz-controls"><label>节点类型<select value={graphTypeFilter} onChange={(event) => setGraphTypeFilter(event.target.value)}><option value="all">全部</option>{graphNodeTypes.map((type) => <option key={type} value={type}>{type}</option>)}</select></label><label>引用关系<select value={graphRelationFilter} onChange={(event) => setGraphRelationFilter(event.target.value)}><option value="all">全部</option>{graphRelations.map((relation) => <option key={relation} value={relation}>{relation}</option>)}</select></label></div><div className="graph-wrap"><CytoscapeComponent elements={graphElements} stylesheet={graphStyle} layout={{ name: "cose", animate: false }} style={{ width: "100%", height: "620px" }} cy={(instance: any) => instance.on("tap", "node", (event: any) => setMessage(`节点：${event.target.data("label")} · 类型：${event.target.data("type")}`))} /></div></div>}
-          {tab === "runtime" && <RuntimePanel commandText={commandText} setCommandText={setCommandText} runCommand={runCommand} startSession={startSession} resetSession={resetSession} actions={runtimeActions} summary={runtimeSummary} trace={trace} candidates={candidates} stateDiff={stateDiff} changedByPath={changedByPath} setChangedByPath={setChangedByPath} inspectChangedBy={inspectChangedBy} changedByMatches={changedByMatches} />}
+          {tab === "runtime" && <RuntimePanel commandText={commandText} setCommandText={setCommandText} runCommand={runCommand} startSession={startSession} resetSession={resetSession} actions={runtimeActions} summary={runtimeSummary} trace={trace} candidates={candidates} stateDiff={stateDiff} changedByPath={changedByPath} setChangedByPath={setChangedByPath} inspectChangedBy={inspectChangedBy} changedByMatches={changedByMatches} busy={runtimeBusy} error={runtimeError} />}
           {tab === "state" && <div className="state-view"><pre>{JSON.stringify(state ?? {}, null, 2)}</pre></div>}
         </section>
         <aside className="inspector">
@@ -490,11 +503,12 @@ function ArgumentFields({ item, args, references, onChange }: { item?: RegistryI
   })}</div>;
 }
 
-function RuntimePanel({ commandText, setCommandText, runCommand, startSession, resetSession, actions, summary, trace, candidates, stateDiff, changedByPath, setChangedByPath, inspectChangedBy, changedByMatches }: { commandText: string; setCommandText: (value: string) => void; runCommand: (command?: Record<string, unknown>) => void; startSession: () => void; resetSession: () => void; actions: RuntimeActions | null; summary: RuntimeSummary | null; trace: Record<string, unknown> | null; candidates: Record<string, unknown> | null; stateDiff: Record<string, unknown> | null; changedByPath: string; setChangedByPath: (value: string) => void; inspectChangedBy: () => void; changedByMatches: Record<string, unknown>[] }) {
+function RuntimePanel({ commandText, setCommandText, runCommand, startSession, resetSession, actions, summary, trace, candidates, stateDiff, changedByPath, setChangedByPath, inspectChangedBy, changedByMatches, busy, error }: { commandText: string; setCommandText: (value: string) => void; runCommand: (command?: Record<string, unknown>) => void; startSession: () => void; resetSession: () => void; actions: RuntimeActions | null; summary: RuntimeSummary | null; trace: Record<string, unknown> | null; candidates: Record<string, unknown> | null; stateDiff: Record<string, unknown> | null; changedByPath: string; setChangedByPath: (value: string) => void; inspectChangedBy: () => void; changedByMatches: Record<string, unknown>[]; busy: boolean; error: string | null }) {
   const travelActions = actions?.actions.filter((action) => action.kind === "travel") ?? [];
   const choiceActions = actions?.actions.filter((action) => action.kind === "choice") ?? [];
   return <div className="runtime-view">
-    <div className="runtime-toolbar"><div><p className="eyebrow">ISOLATED SESSION</p><h1>试玩控制台</h1></div>{actions ? <button onClick={resetSession}><RotateCcw size={16} />重置会话</button> : <button className="primary" onClick={startSession}><Play size={16} />启动试玩</button>}</div>
+    <div className="runtime-toolbar"><div><p className="eyebrow">ISOLATED SESSION</p><h1>试玩控制台</h1></div>{actions ? <button onClick={resetSession}><RotateCcw size={16} />重置会话</button> : <button className="primary" disabled={busy} onClick={startSession}><Play size={16} />{busy ? "启动中..." : "启动试玩"}</button>}</div>
+    {error && <div className="play-error" role="alert">{error}</div>}
     {!actions && <div className="play-empty">启动后，操作按钮会由 Python 引擎根据当前世界状态生成。</div>}
     {actions && <>
       <div className="play-context"><span>角色：{actions.actor.label}</span><span>地点：{actions.location.label ?? actions.location.id}</span><span>时间：第 {actions.time.day ?? "-"} 天 · {actions.time.period ?? "-"} · 刻度 {actions.time.tick ?? "-"}</span></div>

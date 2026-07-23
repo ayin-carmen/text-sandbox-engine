@@ -136,6 +136,8 @@ class EditorServiceTests(unittest.TestCase):
         service.open_workspace(MEDIEVAL_ROOT)
         session = service.create_session()
 
+        self.assertEqual(session["actions"]["location"]["id"], "location.west_gate")
+        self.assertTrue(any(action["kind"] == "travel" for action in session["actions"]["actions"]))
         actions = service.session_actions(session["session_id"])
         self.assertEqual(actions["location"]["id"], "location.west_gate")
         self.assertTrue(any(action["kind"] == "choice" for action in actions["actions"]))

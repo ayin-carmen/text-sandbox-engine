@@ -481,7 +481,12 @@ class EditorService:
         session_id = f"session.{uuid.uuid4().hex[:12]}"
         runtime = Runtime.from_file(self.state_path, content_path=self.content_root)
         self._sessions[session_id] = {"runtime": runtime, "traces": [], "source_revision": _revision(self.state_path)}
-        return {"session_id": session_id, "state": runtime.snapshot(), "traces": []}
+        return {
+            "session_id": session_id,
+            "state": runtime.snapshot(),
+            "traces": [],
+            "actions": self.session_actions(session_id),
+        }
 
     def session_command(self, session_id: str, command: dict[str, Any]) -> dict[str, Any]:
         session = self._sessions.get(session_id)

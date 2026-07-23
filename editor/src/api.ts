@@ -114,7 +114,7 @@ export const api = {
   references: (type?: ReferenceItem["type"]) => request<{ references: ReferenceItem[] }>(`/api/metadata/references${type ? `?type=${encodeURIComponent(type)}` : ""}`),
   sceneTemplates: () => request<{ templates: SceneTemplate[] }>("/api/metadata/scene-templates"),
   sceneFromTemplate: (payload: { name: string; namespace: string; slug: string; location: string; template: string; repeat_policy: string; priority: number; preview: boolean }) => request<{ id: string; requested_id: string; template: string; document: Record<string, unknown>; issues: Diagnostic[]; passed: boolean; conflict_resolved: boolean; scene?: SceneRecord }>("/api/content/scenes/from-template", { method: "POST", body: JSON.stringify(payload) }),
-  createSession: () => request<{ session_id: string; state: Record<string, unknown>; traces: unknown[] }>("/api/runtime/sessions", { method: "POST" }),
+  createSession: () => request<{ session_id: string; state: Record<string, unknown>; traces: unknown[]; actions?: RuntimeActions }>("/api/runtime/sessions", { method: "POST" }),
   command: (sessionId: string, command: Record<string, unknown>) => request<{ status: string; trace: Record<string, unknown>; state: Record<string, unknown>; traces: unknown[]; summary: RuntimeSummary }>(`/api/runtime/sessions/${sessionId}/commands`, { method: "POST", body: JSON.stringify({ command }) }),
   sessionActions: (sessionId: string) => request<RuntimeActions>(`/api/runtime/sessions/${sessionId}/actions`),
   resetSession: (sessionId: string) => request<{ session_id: string; state: Record<string, unknown>; traces: unknown[] }>(`/api/runtime/sessions/${sessionId}/reset`, { method: "POST" }),
