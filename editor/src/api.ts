@@ -58,6 +58,38 @@ export type SceneTemplate = {
   document: Record<string, unknown>;
 };
 
+export type EntityType = {
+  id: "actor" | "location" | "item";
+  label: string;
+  description: string;
+};
+
+export type EntityTemplate = {
+  id: string;
+  type: "actor" | "location" | "item";
+  label: string;
+  description: string;
+  document: Record<string, unknown>;
+};
+
+export type EntityRecord = {
+  id: string;
+  type: "actor" | "location" | "item";
+  label: string;
+  tags: string[];
+  path: string;
+  revision: string;
+  diagnostic_count: number;
+  document?: Record<string, unknown>;
+};
+
+export type EntityUsage = {
+  source: string;
+  json_path: string;
+  kind: string;
+  description: string;
+};
+
 export type RuntimeAction = {
   id: string;
   kind: "travel" | "choice" | string;
@@ -101,6 +133,15 @@ export const api = {
   open: (root: string) => request<{ root: string; content_root: string; state_path: string; scene_count: number }>("/api/workspaces/open", { method: "POST", body: JSON.stringify({ root }) }),
   tree: () => request<{ entries: Array<{ path: string; kind: string; revision: string }> }>("/api/workspaces/tree"),
   sourceState: () => request<{ state: Record<string, unknown>; path: string; revision: string }>("/api/workspaces/state"),
+  entityTypes: () => request<{ types: EntityType[] }>("/api/metadata/entity-types"),
+  entityTemplates: () => request<{ templates: EntityTemplate[] }>("/api/metadata/entity-templates"),
+  entities: (type?: EntityRecord["type"], query?: string) => request<{ entities: EntityRecord[] }>(`/api/world/entities${type || query ? `?${new URLSearchParams({ ...(type ? { type } : {}), ...(query ? { query } : {}) }).toString()}` : ""}`),
+  entity: (entityId: string) => request<EntityRecord>(`/api/world/entities/${encodeURIComponent(entityId)}`),
+  entityUsages: (entityId: string) => request<{ entity_id: string; usages: EntityUsage[] }>(`/api/world/entities/${encodeURIComponent(entityId)}/usages`),
+  entityFromTemplate: (payload: { type: EntityRecord["type"]; namespace: string; slug: string; name: string; tags: string[]; location?: string; template: string; preview: boolean }) => request<{ id: string; document: Record<string, unknown>; issues: Diagnostic[]; passed: boolean; entity?: EntityRecord }>("/api/world/entities/from-template", { method: "POST", body: JSON.stringify(payload) }),
+  saveEntity: (entityId: string, document: Record<string, unknown>, revision: string) => request<EntityRecord>(`/api/world/entities/${encodeURIComponent(entityId)}`, { method: "PUT", body: JSON.stringify({ document, revision }) }),
+  deleteEntity: (entityId: string, revision: string) => request<{ deleted: string }>(`/api/world/entities/${encodeURIComponent(entityId)}?revision=${encodeURIComponent(revision)}`, { method: "DELETE" }),
+  validateWorldState: () => request<{ passed: boolean; issues: Diagnostic[] }>("/api/validation/world-state", { method: "POST" }),
   scenes: () => request<{ scenes: SceneRecord[] }>("/api/content/scenes"),
   saveScene: (sceneId: string, document: Record<string, unknown>, revision: string) => request<SceneRecord>(`/api/content/scenes/${encodeURIComponent(sceneId)}`, { method: "PUT", body: JSON.stringify({ document, revision }) }),
   createScene: (document: Record<string, unknown>) => request<SceneRecord>("/api/content/scenes", { method: "POST", body: JSON.stringify({ document }) }),

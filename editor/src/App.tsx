@@ -5,8 +5,9 @@ import cytoscape from "cytoscape";
 import { ArrowDown, ArrowUp, Braces, CheckCircle2, CircleAlert, Copy, FileJson, FolderOpen, GitBranch, Play, RotateCcw, Save, Sparkles, Trash2 } from "lucide-react";
 import { api, Diagnostic, GraphData, ReferenceItem, RegistryItem, RuntimeActions, RuntimeSummary, SceneRecord, SceneTemplate } from "./api";
 import { ReferenceSelect } from "./LowCodeWidgets";
+import { EntityWorkspace } from "./EntityWorkspace";
 
-type Tab = "form" | "json" | "graph" | "runtime" | "state";
+type Tab = "form" | "json" | "graph" | "runtime" | "state" | "entities";
 
 function App() {
   const [root, setRoot] = useState("examples/medieval_town");
@@ -23,6 +24,8 @@ function App() {
   const [registryItems, setRegistryItems] = useState<RegistryItem[]>([]);
   const [references, setReferences] = useState<ReferenceItem[]>([]);
   const [sceneTemplates, setSceneTemplates] = useState<SceneTemplate[]>([]);
+  const [entityRecords, setEntityRecords] = useState<import("./api").EntityRecord[]>([]);
+  const [entityTemplates, setEntityTemplates] = useState<import("./api").EntityTemplate[]>([]);
   const [wizardOpen, setWizardOpen] = useState(false);
   const [focusedPath, setFocusedPath] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -38,6 +41,10 @@ function App() {
   const [changedByPath, setChangedByPath] = useState("entities.actor.player.components.location.current");
   const [commandText, setCommandText] = useState(JSON.stringify({ type: "space.travel_to", actor: "actor.player", target: "location.market_square", args: {} }, null, 2));
   const isDirty = Boolean(selected && rawJson !== JSON.stringify(selected.document, null, 2));
+
+  const refreshEntities = async () => {
+    setEntityRecords((await api.entities()).entities);
+  };
 
   useEffect(() => {
     if (!isDirty) return;
@@ -65,6 +72,8 @@ function App() {
       setRegistryItems((await api.registry()).items);
       setReferences((await api.references()).references);
       setSceneTemplates((await api.sceneTemplates()).templates);
+      await refreshEntities();
+      setEntityTemplates((await api.entityTemplates()).templates);
       setState((await api.sourceState()).state);
       setSessionId(null);
       setRuntimeActions(null);
@@ -317,6 +326,7 @@ function App() {
             <button className={tab === "graph" ? "active" : ""} onClick={() => setTab("graph")}><GitBranch size={15} />关系图</button>
             <button className={tab === "runtime" ? "active" : ""} onClick={() => setTab("runtime")}><Play size={15} />运行预览</button>
             <button className={tab === "state" ? "active" : ""} onClick={() => setTab("state")}>World State</button>
+            <button className={tab === "entities" ? "active" : ""} onClick={() => setTab("entities")}>世界实体</button>
           </nav>
           {!selected && <div className="empty">打开一个真实内容包开始编辑。</div>}
           {selected && tab === "form" && <SceneForm document={formDocument} updateField={updateField} registryItems={registryItems} references={references} focusedPath={focusedPath} />}
@@ -324,6 +334,7 @@ function App() {
           {tab === "graph" && <div className="graph-view"><div className="viz-controls"><label>节点类型<select value={graphTypeFilter} onChange={(event) => setGraphTypeFilter(event.target.value)}><option value="all">全部</option>{graphNodeTypes.map((type) => <option key={type} value={type}>{type}</option>)}</select></label><label>引用关系<select value={graphRelationFilter} onChange={(event) => setGraphRelationFilter(event.target.value)}><option value="all">全部</option>{graphRelations.map((relation) => <option key={relation} value={relation}>{relation}</option>)}</select></label></div><div className="graph-wrap"><CytoscapeComponent elements={graphElements} stylesheet={graphStyle} layout={{ name: "cose", animate: false }} style={{ width: "100%", height: "620px" }} cy={(instance: any) => instance.on("tap", "node", (event: any) => setMessage(`节点：${event.target.data("label")} · 类型：${event.target.data("type")}`))} /></div></div>}
           {tab === "runtime" && <RuntimePanel commandText={commandText} setCommandText={setCommandText} runCommand={runCommand} startSession={startSession} resetSession={resetSession} actions={runtimeActions} summary={runtimeSummary} trace={trace} candidates={candidates} stateDiff={stateDiff} changedByPath={changedByPath} setChangedByPath={setChangedByPath} inspectChangedBy={inspectChangedBy} changedByMatches={changedByMatches} busy={runtimeBusy} error={runtimeError} />}
           {tab === "state" && <div className="state-view"><pre>{JSON.stringify(state ?? {}, null, 2)}</pre></div>}
+          {tab === "entities" && <EntityWorkspace entities={entityRecords} templates={entityTemplates} references={references} onRefresh={refreshEntities} onMessage={setMessage} />}
         </section>
         <aside className="inspector">
           <div className="panel-title">检查器</div>
