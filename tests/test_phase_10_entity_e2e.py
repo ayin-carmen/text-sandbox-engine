@@ -53,6 +53,9 @@ class PhaseTenEntityApiE2ETests(unittest.TestCase):
             listed = client.get("/api/world/entities", params={"type": "item", "query": "凭证"}).json()["entities"]
             self.assertEqual([entry["id"] for entry in listed], ["item.greybrook.river_token"])
             self.assertTrue(any(entry["id"] == "item.greybrook.river_token" and entry["valid"] for entry in client.get("/api/metadata/references", params={"type": "item"}).json()["references"]))
+            graph = client.get("/api/graph/content").json()
+            self.assertIn("actor.greybrook.ferryman", {node["id"] for node in graph["nodes"]})
+            self.assertTrue(any(edge["relation"] == "located_at" for edge in graph["edges"]))
 
             current_actor = client.get(f"/api/world/entities/{actor['id']}").json()
             revision = current_actor["revision"]
@@ -61,6 +64,10 @@ class PhaseTenEntityApiE2ETests(unittest.TestCase):
             saved = client.put(f"/api/world/entities/{actor['id']}", json={"document": actor_document, "revision": revision})
             self.assertEqual(saved.status_code, 200)
             self.assertIn("ferryman", saved.json()["document"]["tags"])
+            actor_document["components"]["location"]["current"] = "location.missing"
+            invalid = client.post(f"/api/validation/entity?entity_id={actor['id']}", json={"document": actor_document})
+            self.assertFalse(invalid.json()["passed"])
+            self.assertIn("$.entities[\"actor.greybrook.ferryman\"].components.location.current", {issue["json_path"] for issue in invalid.json()["issues"]})
 
             usages = client.get("/api/world/entities/location.west_gate/usages")
             self.assertEqual(usages.status_code, 200)

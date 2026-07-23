@@ -53,6 +53,21 @@ export function EntityWorkspace({ entities, templates, references, onRefresh, on
     return () => { cancelled = true; };
   }, [selectedId, onMessage]);
 
+  useEffect(() => {
+    if (!selected || !rawJson) return;
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      try {
+        const document = JSON.parse(rawJson) as Record<string, unknown>;
+        const result = await api.validateEntity(document, selected.id);
+        if (!cancelled) setIssues(result.issues);
+      } catch (error) {
+        if (!cancelled) setIssues([{ severity: "error", code: "world.invalid_json", message: error instanceof Error ? error.message : "JSON 语法无效", file: null, json_path: "$" }]);
+      }
+    }, 300);
+    return () => { cancelled = true; window.clearTimeout(timer); };
+  }, [rawJson, selected?.id]);
+
   const selectEntity = (entity: EntityRecord) => {
     if (dirty && !window.confirm("当前实体有未保存修改，确定放弃并切换吗？")) return;
     setSelectedId(entity.id);

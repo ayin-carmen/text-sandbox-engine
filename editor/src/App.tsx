@@ -534,6 +534,9 @@ function RuntimePanel({ commandText, setCommandText, runCommand, startSession, r
 const graphStyle: any[] = [
   { selector: "node", style: { label: "data(label)", "font-size": 10, "background-color": "#5b6b8c", color: "#f7f4ec", "text-valign": "center", "text-halign": "center", width: 34, height: 34, "border-width": 1, "border-color": "#c7d2e6" } },
   { selector: 'node[type="scene"]', style: { "background-color": "#b85c38", width: 46, height: 46 } },
+  { selector: 'node[type="actor"]', style: { "background-color": "#357a72" } },
+  { selector: 'node[type="location"]', style: { "background-color": "#5b6b8c" } },
+  { selector: 'node[type="item"]', style: { "background-color": "#a67c35" } },
   { selector: 'node[type="effect"]', style: { "background-color": "#357a72" } },
   { selector: 'node[type="rule"]', style: { "background-color": "#7a5c9e" } },
   { selector: "edge", style: { width: 1, "line-color": "#9aa5b5", "target-arrow-color": "#9aa5b5", "target-arrow-shape": "triangle", label: "data(relation)", "font-size": 8, color: "#697386", "curve-style": "bezier" } },

@@ -128,6 +128,10 @@ def create_app(service: EditorService | None = None) -> FastAPI:
     def validate_world_state():
         return editor.validate_world_state()
 
+    @app.post("/api/validation/entity")
+    def validate_entity(payload: EntityDocument, entity_id: str | None = Query(default=None)):
+        return editor.validate_entity_document(payload.document, entity_id)
+
     @app.post("/api/world/entities/from-template")
     def entity_from_template(payload: EntityTemplateRequest):
         try:

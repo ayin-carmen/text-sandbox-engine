@@ -142,6 +142,7 @@ export const api = {
   saveEntity: (entityId: string, document: Record<string, unknown>, revision: string) => request<EntityRecord>(`/api/world/entities/${encodeURIComponent(entityId)}`, { method: "PUT", body: JSON.stringify({ document, revision }) }),
   deleteEntity: (entityId: string, revision: string) => request<{ deleted: string }>(`/api/world/entities/${encodeURIComponent(entityId)}?revision=${encodeURIComponent(revision)}`, { method: "DELETE" }),
   validateWorldState: () => request<{ passed: boolean; issues: Diagnostic[] }>("/api/validation/world-state", { method: "POST" }),
+  validateEntity: (document: Record<string, unknown>, entityId?: string) => request<{ passed: boolean; issues: Diagnostic[] }>(`/api/validation/entity${entityId ? `?entity_id=${encodeURIComponent(entityId)}` : ""}`, { method: "POST", body: JSON.stringify({ document }) }),
   scenes: () => request<{ scenes: SceneRecord[] }>("/api/content/scenes"),
   saveScene: (sceneId: string, document: Record<string, unknown>, revision: string) => request<SceneRecord>(`/api/content/scenes/${encodeURIComponent(sceneId)}`, { method: "PUT", body: JSON.stringify({ document, revision }) }),
   createScene: (document: Record<string, unknown>) => request<SceneRecord>("/api/content/scenes", { method: "POST", body: JSON.stringify({ document }) }),

@@ -279,6 +279,15 @@ class EditorService:
                         issues.append(_issue("reference.missing_target", f"找不到相邻地点：{target}", self.state_path, _entity_json_path(str(entity_id), f"components.map_node.connections[{index}]"), str(entity_id), "请选择已有地点。"))
         return {"passed": not issues, "issues": issues}
 
+    def validate_entity_document(self, document: dict[str, Any], entity_id: str | None = None) -> dict[str, Any]:
+        self._require_workspace()
+        assert self.state_path is not None
+        state = load_world_state(self.state_path)
+        target_id = entity_id or str(document.get("id", ""))
+        next_state = deepcopy(state)
+        next_state.setdefault("entities", {})[target_id] = deepcopy(document)
+        return self.validate_world_state(next_state)
+
     def _validate_entity_document(self, document: Any, state: dict[str, Any], entity_id: str) -> list[dict[str, Any]]:
         assert self.state_path is not None
         base = f'$.entities["{entity_id}"]'
@@ -325,10 +334,9 @@ class EditorService:
             document = record["document"]
             if document.get("scope", {}).get("location") == entity_id:
                 usages.append({"source": self._source_label(Path(record["path"])), "json_path": "$.scope.location", "kind": "scene", "description": f"场景 {record['id']} 的所属地点"})
-            for kind, type_id, args, json_path in _scene_argument_paths(document, self._registry()):
-                for index, value in enumerate(args):
-                    if value == entity_id:
-                        usages.append({"source": self._source_label(Path(record["path"])), "json_path": f"{json_path}[{index}]", "kind": kind, "description": f"场景 {record['id']} 的 {type_id} 引用"})
+            for reference_type, type_id, value, json_path in _scene_reference_paths(document, self._registry()):
+                if value == entity_id:
+                    usages.append({"source": self._source_label(Path(record["path"])), "json_path": json_path, "kind": reference_type, "description": f"场景 {record['id']} 的 {type_id} 引用"})
         return {"entity_id": entity_id, "usages": usages}
 
     def scenes(self) -> list[dict[str, Any]]:
@@ -678,8 +686,34 @@ class EditorService:
 
     def graph(self) -> dict[str, Any]:
         self._require_workspace()
+        assert self.state_path is not None
         nodes: dict[str, dict[str, Any]] = {}
         edges: list[dict[str, Any]] = []
+        state = load_world_state(self.state_path)
+        for entity_id, document in state.get("entities", {}).items():
+            if not isinstance(document, dict):
+                continue
+            entity_type = str(document.get("type", "entity"))
+            nodes[entity_id] = {"id": entity_id, "type": entity_type, "label": _entity_label(document, str(entity_id)), "path": str(self.state_path)}
+            components = document.get("components", {})
+            if not isinstance(components, dict):
+                continue
+            current = components.get("location", {}).get("current") if isinstance(components.get("location"), dict) else None
+            if isinstance(current, str):
+                self._node(nodes, current, "location", current)
+                edges.append(_edge(str(entity_id), current, "located_at", _entity_json_path(str(entity_id), "components.location.current"), str(self.state_path)))
+            inventory = components.get("inventory", {}).get("items", []) if isinstance(components.get("inventory"), dict) else []
+            if isinstance(inventory, list):
+                for index, item_id in enumerate(inventory):
+                    if isinstance(item_id, str):
+                        self._node(nodes, item_id, "item", item_id)
+                        edges.append(_edge(str(entity_id), item_id, "contains", _entity_json_path(str(entity_id), f"components.inventory.items[{index}]"), str(self.state_path)))
+            connections = components.get("map_node", {}).get("connections", []) if isinstance(components.get("map_node"), dict) else []
+            if isinstance(connections, list):
+                for index, target in enumerate(connections):
+                    if isinstance(target, str):
+                        self._node(nodes, target, "location", target)
+                        edges.append(_edge(str(entity_id), target, "connects", _entity_json_path(str(entity_id), f"components.map_node.connections[{index}]"), str(self.state_path)))
         for record in self._scene_records():
             scene = record["document"]
             scene_id = record["id"]
@@ -1074,21 +1108,30 @@ def _document_reference_values(document: dict[str, Any]) -> list[tuple[str, tupl
     return values
 
 
-def _scene_argument_paths(document: dict[str, Any], registry: Registry) -> list[tuple[str, str, list[Any], str]]:
+def _scene_reference_paths(document: dict[str, Any], registry: Registry) -> list[tuple[str, str, Any, str]]:
     metadata = {(item["kind"], item["type_id"]): item for item in registry.metadata()}
-    result: list[tuple[str, str, list[Any], str]] = []
+    result: list[tuple[str, str, Any, str]] = []
     for index, condition in enumerate(document.get("conditions", [])):
         if isinstance(condition, dict) and isinstance(condition.get("args"), list):
-            result.append(("rule", str(condition.get("rule", "")), condition["args"], f"$.conditions[{index}].args"))
+            item = metadata.get(("rule", str(condition.get("rule", ""))))
+            for argument_index, parameter in enumerate(item.get("parameters", []) if item else []):
+                if parameter.get("reference_type") and argument_index < len(condition["args"]):
+                    result.append((str(parameter["reference_type"]), str(condition.get("rule", "")), condition["args"][argument_index], f"$.conditions[{index}].args[{argument_index}]"))
     for choice_index, choice in enumerate(document.get("choices", [])):
         if not isinstance(choice, dict):
             continue
         for condition_index, condition in enumerate(choice.get("visible_if", [])):
             if isinstance(condition, dict) and isinstance(condition.get("args"), list):
-                result.append(("rule", str(condition.get("rule", "")), condition["args"], f"$.choices[{choice_index}].visible_if[{condition_index}].args"))
+                item = metadata.get(("rule", str(condition.get("rule", ""))))
+                for argument_index, parameter in enumerate(item.get("parameters", []) if item else []):
+                    if parameter.get("reference_type") and argument_index < len(condition["args"]):
+                        result.append((str(parameter["reference_type"]), str(condition.get("rule", "")), condition["args"][argument_index], f"$.choices[{choice_index}].visible_if[{condition_index}].args[{argument_index}]"))
         for effect_index, effect in enumerate(choice.get("effects", [])):
             if isinstance(effect, dict) and isinstance(effect.get("args"), list):
-                result.append(("effect", str(effect.get("effect", "")), effect["args"], f"$.choices[{choice_index}].effects[{effect_index}].args"))
+                item = metadata.get(("effect", str(effect.get("effect", ""))))
+                for argument_index, parameter in enumerate(item.get("parameters", []) if item else []):
+                    if parameter.get("reference_type") and argument_index < len(effect["args"]):
+                        result.append((str(parameter["reference_type"]), str(effect.get("effect", "")), effect["args"][argument_index], f"$.choices[{choice_index}].effects[{effect_index}].args[{argument_index}]"))
     return result
 
 
