@@ -14,7 +14,7 @@
 - Python 测试 43 项通过。
 - React 组件测试 4 项通过。
 - TypeScript/Vite 生产构建和 Python 编译检查通过。
-- Tauri Windows 桌面构建将在本次代码推送后复核。
+- Tauri Windows 桌面构建已由 GitHub Actions 通过，并上传 `text-sandbox-editor-windows` Artifact。
 
 ## 2026-07-24 - 完成阶段 10.5 实体引用联动与校验
 

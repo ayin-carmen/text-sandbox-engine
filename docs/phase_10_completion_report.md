@@ -45,5 +45,6 @@
 - TypeScript 类型检查与 Vite 生产构建通过。
 - Python `compileall` 通过。
 - 真实内容包副本完成角色、地点、物品创建、更新、引用索引、删除保护和实体校验。
-- Tauri Windows 桌面构建将在本次代码推送后由 GitHub Actions 复核。
+- Tauri Windows 桌面构建已由 GitHub Actions 通过，并上传 `text-sandbox-editor-windows` Artifact。
 
+构建运行：[GitHub Actions 30039652508](https://github.com/ayin-carmen/text-sandbox-engine/actions/runs/30039652508)。

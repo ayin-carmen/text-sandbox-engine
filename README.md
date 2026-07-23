@@ -95,7 +95,7 @@ PYTHONPATH=src python -m text_sandbox_engine.cli changed-by --trace trace.json -
 
 ## Current Status
 
-项目已完成阶段 9，阶段 10 世界实体编辑器正在完成最终验证。
+项目已完成阶段 10：世界实体编辑器已支持角色、地点和物品的创建、编辑、引用联动与安全保存。
 
 已完成：
 
